@@ -51,7 +51,7 @@ common common
     , old-time      ^>=1.1
     , parsec        ^>=3.1
     , regex-compat  ^>=0.95
-    , time          >=1.8 && <1.13
+    , time          >=1.8  && <1.13
 
   if !os(windows)
     build-depends: unix ^>=2.7
@@ -60,15 +60,15 @@ common common
   default-language: Haskell2010
 
 library
-  import:             common
-  hs-source-dirs:     src
+  import:          common
+  hs-source-dirs:  src
   build-depends:
-    , array       ^>=0.5
-    , hslogger    ^>=1.3
-    , mtl         ^>=2.2
-    , old-locale  ^>=1.0
-    , process     ^>=1.6
-    , transformers ^>=0.5
+    , array         ^>=0.5
+    , hslogger      ^>=1.3
+    , mtl           ^>=2.2
+    , old-locale    ^>=1.0
+    , process       ^>=1.6
+    , transformers  ^>=0.5
 
   if flag(network--ge-3_0_0)
     build-depends:
@@ -125,14 +125,6 @@ library
     System.Posix.Consts
     System.Time.Utils
     Text.ParserCombinators.Parsec.Utils
-
-  other-extensions:
-    CPP
-    Safe
-    Trustworthy
-    TypeSynonymInstances
-
-----------------------------------------------------------------------------
 
 test-suite runtests
   import:         common
