@@ -1,5 +1,4 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE Safe #-}
 {- arch-tag: HVFS Combinators
 Copyright (c) 2004-2011 John Goerzen <jgoerzen@complete.org>
 
@@ -29,11 +28,10 @@ module System.IO.HVFS.Combinators ( -- * Restrictions
 import           System.IO
 import           System.IO.Error
 import           System.IO.HVFS
-import           System.IO.HVFS.InstanceHelpers (getFullPath)
-import           System.FilePath                (isPathSeparator, pathSeparator,
-                                                 (</>))
-import           System.Path                    (secureAbsNormPath)
-import           System.Path.NameManip          (normalise_path)
+import           System.IO.HVFS.InstanceHelpers
+import           System.FilePath
+import           System.Path
+import           System.Path.NameManip
 
 ----------------------------------------------------------------------
 -- Providing read-only access

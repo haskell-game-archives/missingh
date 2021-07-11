@@ -1,4 +1,3 @@
-{-# LANGUAGE Safe #-}
 {-# LANGUAGE LambdaCase #-}
 {- arch-tag: HVFS instance helpers
 Copyright (c) 2004-2011 John Goerzen <jgoerzen@complete.org>
@@ -34,17 +33,15 @@ module System.IO.HVFS.InstanceHelpers(-- * HVFSStat objects
                                         getFullSlice)
     where
 
-import           Data.IORef            (IORef, newIORef, readIORef, writeIORef)
-import           Data.List             (genericLength)
-import           System.FilePath       (isPathSeparator, pathSeparator, (</>))
+import           Data.IORef
+import           Data.List
+import           System.FilePath
 import           System.IO
-import           System.IO.Error       (doesNotExistErrorType,
-                                        illegalOperationErrorType,
-                                        permissionErrorType)
+import           System.IO.Error
 import           System.IO.HVFS
-import           System.IO.HVIO        (newStreamReader)
-import           System.Path           (absNormPath)
-import           System.Path.NameManip (slice_path)
+import           System.IO.HVIO
+import           System.Path
+import           System.Path.NameManip
 
 {- | A simple "System.IO.HVFS.HVFSStat"
 class that assumes that everything is either a file
