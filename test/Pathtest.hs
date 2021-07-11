@@ -13,14 +13,16 @@ import System.FilePath (pathSeparator)
 import System.Path
 import Test.HUnit
 
+sep :: String -> String
 sep = map (\c -> if c == '/' then pathSeparator else c)
 
+test_absNormPath :: [Test]
 test_absNormPath =
-  let f base' p' exp' = TestLabel (show (base, p)) $ TestCase $ exp @=? absNormPath base p
+  let f base' p' exp' = TestLabel (show (base, p)) $ TestCase $ exp'' @=? absNormPath base p
         where
           base = sep base'
           p = sep p'
-          exp = fmap sep exp'
+          exp'' = fmap sep exp'
       f2 = f "/usr/1/2"
    in [ f "/" "" (Just "/"),
         f "/usr/test" "" (Just "/usr/test"),
@@ -37,12 +39,13 @@ test_absNormPath =
         f2 "../../../.." Nothing
       ]
 
+test_secureAbsNormPath :: [Test]
 test_secureAbsNormPath =
-  let f base' p' exp' = TestLabel (show (base, p)) $ TestCase $ exp @=? secureAbsNormPath base p
+  let f base' p' exp' = TestLabel (show (base, p)) $ TestCase $ exp'' @=? secureAbsNormPath base p
         where
           base = sep base'
           p = sep p'
-          exp = fmap sep exp'
+          exp'' = fmap sep exp'
       f2 = f "/usr/1/2"
    in [ f "/" "" (Just "/"),
         f "/usr/test" "" (Just "/usr/test"),
@@ -61,11 +64,12 @@ test_secureAbsNormPath =
         f2 "../../../.." Nothing
       ]
 
+test_splitExt :: [Test]
 test_splitExt =
-  let f inp' exp' = TestCase $ exp @=? splitExt inp
+  let f inp' exp' = TestCase $ exp'' @=? splitExt inp
         where
           inp = sep inp'
-          exp = (\(x, y) -> (sep x, y)) exp'
+          exp'' = (\(x, y) -> (sep x, y)) exp'
    in [ f "" ("", ""),
         f "/usr/local" ("/usr/local", ""),
         f "../foo.txt" ("../foo", ".txt"),
@@ -74,6 +78,7 @@ test_splitExt =
         f "foo.txt/bar.bz" ("foo.txt/bar", ".bz")
       ]
 
+tests :: Test
 tests =
   TestList
     [ TestLabel "splitExt" (TestList test_splitExt),
