@@ -13,11 +13,12 @@ import Data.CSV
 import Test.HUnit
 import Text.ParserCombinators.Parsec
 
+test_csv :: [Test]
 test_csv =
-  let f inp exp =
+  let f inp exp' =
         TestLabel inp $
           TestCase $
-            exp @=? case parse csvFile "" inp of
+            exp' @=? case parse csvFile "" inp of
               Right x -> Right x
               Left y -> Left (show y)
    in [ f "" (Right []),
@@ -31,4 +32,5 @@ test_csv =
         f "\"Embedded\"\"Quote\"\n" (Right [["Embedded\"Quote"]])
       ]
 
+tests :: Test
 tests = TestList [TestLabel "csv" (TestList test_csv)]

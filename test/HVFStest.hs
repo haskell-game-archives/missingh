@@ -45,7 +45,6 @@ test_nice_slice =
           fp = sep fp'
    in [ f [] "/",
         f ["foo", "bar"] "/foo/bar"
-        --,f [] "."
       ]
 
 test_content :: [Test]
@@ -99,11 +98,7 @@ test_chroot =
               [] @=? y
               vSetCurrentDirectory x ".."
               sep "/" `ioeq` vGetCurrentDirectory x
-              --vSetCurrentDirectory x ".."
-              --"/" `ioeq` vGetCurrentDirectory x
           )
-          --,f "test.txt" (\x -> "subdir test" `ioeq`
-          --               (vOpen x "/test.txt" ReadMode >>= vGetContents))
       ]
 
 test_structure :: [Test]

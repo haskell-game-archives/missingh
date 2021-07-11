@@ -24,23 +24,6 @@ mf fn exp' conf = TestLabel fn $
           joinPath ["testsrc", "gzfiles", fn]
       assertEqual "" exp' (conf c)
 
-{-
-import System.FileArchive.GZip
-import System.IO
-import Data.Either.Utils
-
-main = do
-       c <- hGetContents stdin
-       let x = snd . forceEither . read_header $ c
-       putStr x
-
-test_bunches =
-    let f fn exp conv = mf fn exp (conv . snd . forceEither . read_header)
-        f2 c = let fn = "t/z" ++ (show c) ++ ".gz" in
-                   f fn c (length . inflate_string)
-        in
-        map f2 [0..1000]
--}
 test_inflate :: [Test]
 test_inflate =
   let f fn exp' conv = mf fn exp' (conv . snd . forceEither . read_header)
@@ -53,10 +36,6 @@ test_inflate =
           )
           inflate_string_remainder,
         f "empty.gz" "" inflate_string
-        --,f "zeros.gz" 10485760 (length . inflate_string)
-        -- BAD BAD ,f "zeros.gz" (replicate (10 * 1048576) '\0') inflate_string
-        -- This line tests Igloo's code:
-        --,f "zeros.gz" True (\x -> (replicate 10485760 '\0') == inflate_string x)
       ]
 
 test_header :: [Test]
@@ -94,12 +73,6 @@ test_gunzip =
    in [ f "t1.gz" ("Test 1", Nothing),
         f "t1bad.gz" ("Test 1", Just CRCError),
         f "t2.gz" ("Test 1Test 2", Nothing)
-        -- The following tests my code
-        {-
-        ,mf "zeros.gz" True (\x -> case decompress x of
-                             (y, _) -> y == replicate 10485760 '\0'
-                            )
-         -}
       ]
 
 tests :: Test
@@ -107,6 +80,5 @@ tests =
   TestList
     [ TestLabel "inflate" (TestList test_inflate),
       TestLabel "header" (TestList test_header),
-      --                  TestLabel "bunches" (TestList test_bunches),
       TestLabel "gunzip" (TestList test_gunzip)
     ]

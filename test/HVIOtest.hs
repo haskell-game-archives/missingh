@@ -8,7 +8,6 @@ For license and copyright information, see the file LICENSE
 
 module HVIOtest (tests) where
 
-import Control.Exception
 import System.IO
 import System.IO.Error
 import System.IO.HVIO
@@ -16,10 +15,11 @@ import Test.HUnit
 import TestUtils
 
 ioeq :: (Show a, Eq a) => a -> IO a -> Assertion
-ioeq exp inp = do
+ioeq exp' inp = do
   x <- inp
-  exp @=? x
+  exp' @=? x
 
+test_MemoryBuffer :: [Test]
 test_MemoryBuffer =
   let f inp testfunc = TestLabel inp $
         TestCase $ do
@@ -55,6 +55,7 @@ test_MemoryBuffer =
           )
       ]
 
+test_StreamReader :: [Test]
 test_StreamReader =
   let f inp testfunc = TestLabel inp $
         TestCase $ do
@@ -92,6 +93,7 @@ test_StreamReader =
           )
       ]
 
+tests :: Test
 tests =
   TestList
     [ TestLabel "streamReader" (TestList test_StreamReader),

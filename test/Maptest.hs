@@ -12,8 +12,9 @@ import Data.Map as M
 import Data.Map.Utils
 import Test.HUnit
 
+test_flipM :: [Test]
 test_flipM =
-  let f inp exp = TestCase $ (M.fromList exp) @=? flipM (M.fromList inp)
+  let f inp exp' = TestCase $ (M.fromList exp') @=? flipM (M.fromList inp)
    in [ f ([] :: [(Int, Int)]) ([] :: [(Int, [Int])]),
         f [("a", "b")] [("b", ["a"])],
         f
@@ -27,14 +28,16 @@ test_flipM =
           ]
       ]
 
+test_flippedLookupM :: [Test]
 test_flippedLookupM =
-  let f item inp exp = TestCase $ exp @=? flippedLookupM item (M.fromList inp)
+  let f item inp exp' = TestCase $ exp' @=? flippedLookupM item (M.fromList inp)
    in [ f 'a' ([] :: [(Char, Char)]) [],
         f 'a' [("Test1", 'a'), ("Test2", 'b')] ["Test1"],
         f 'a' [("Test1", 'b'), ("Test2", 'b')] [],
         f 'a' [("Test1", 'a'), ("Test2", 'a')] ["Test2", "Test1"]
       ]
 
+tests :: Test
 tests =
   TestList
     [ TestLabel "flipM" (TestList test_flipM),

@@ -14,6 +14,7 @@ import Test.HUnit
 import TestUtils
 import Text.Regex
 
+test_lstrip :: [Test]
 test_lstrip =
   mapassertEqual
     "lstrip"
@@ -26,6 +27,7 @@ test_lstrip =
       ("abc def", "abc def")
     ]
 
+test_rstrip :: [Test]
 test_rstrip =
   mapassertEqual
     "rstrip"
@@ -38,6 +40,7 @@ test_rstrip =
       ("abc def", "abc def")
     ]
 
+test_strip :: [Test]
 test_strip =
   mapassertEqual
     "strip"
@@ -52,14 +55,16 @@ test_strip =
       ("abc def", "abc def")
     ]
 
+test_splitWs :: [Test]
 test_splitWs =
-  let f exp inp = TestCase $ exp @=? splitWs inp
+  let f exp' inp = TestCase $ exp' @=? splitWs inp
    in [ f [] "    ",
         f [] "",
         f ["asdf"] " asdf\n",
         f ["one", "two", "three"] "  one\ntwo \tthree \n"
       ]
 
+test_escapeRe :: [Test]
 test_escapeRe =
   map
     ( \i ->
@@ -80,6 +85,7 @@ test_escapeRe =
   where
     teststr = map chr [1 .. 255]
 
+tests :: Test
 tests =
   TestList
     [ TestLabel "lstrip" (TestList test_lstrip),

@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeApplications #-}
 {-
 Copyright (C) 2006-2011 John Goerzen <jgoerzen@complete.org>
 
@@ -12,6 +13,7 @@ import Control.Concurrent.MVar
 import Data.Progress.Tracker
 import Test.HUnit
 
+setup :: IO (Progress, MVar Integer)
 setup =
   do
     timem <- newMVar 0
@@ -19,11 +21,13 @@ setup =
     po <- newProgress' (ProgressStatus 0 100 0 "" timesource) []
     return (po, timem)
 
+settime :: MVar a -> a -> IO ()
 settime timem newval = swapMVar timem newval >> return ()
 
+test_incrP :: IO ()
 test_incrP =
   do
-    (po, timem) <- setup
+    (po, _timem) <- setup
     incrP po 5
     withStatus po $ \s ->
       do
@@ -50,9 +54,10 @@ test_incrP =
         110 @=? completedUnits s
         115 @=? totalUnits s
 
+test_setP :: IO ()
 test_setP =
   do
-    (po, timem) <- setup
+    (po, _timem) <- setup
     setP po 5
     withStatus po $ \s ->
       do
@@ -79,42 +84,44 @@ test_setP =
         110 @=? completedUnits s
         115 @=? totalUnits s
 
+test_speed :: IO ()
 test_speed =
   do
     (po, timem) <- setup
-    getSpeed po >>= assertEqual "initial speed" 0
+    getSpeed po >>= assertEqual @Double "initial speed" 0
     getETR po >>= assertEqual "initial ETR" 0
     getETA po >>= assertEqual "initial ETA" 0
 
     incrP po 10
-    getSpeed po >>= assertEqual "speed after incr" 0
+    getSpeed po >>= assertEqual @Double "speed after incr" 0
     getETR po >>= assertEqual "ETR after incr" 0
     getETA po >>= assertEqual "ETA after incr" 0
 
     settime timem 5
-    getSpeed po >>= assertEqual "first speed" 2.0
+    getSpeed po >>= assertEqual @Double "first speed" 2.0
     getETR po >>= assertEqual "first ETR" 45
     getETA po >>= assertEqual "first ETA" 50
 
     incrP po 90
-    getSpeed po >>= assertEqual "speed 2" 20.0
+    getSpeed po >>= assertEqual @Double "speed 2" 20.0
     getETR po >>= assertEqual "etr 2" 0
     getETA po >>= assertEqual "eta 2" 5
 
     settime timem 400
     setP po 90
-    getSpeed po >>= assertEqual "speed 3" 0.225
+    getSpeed po >>= assertEqual @Double "speed 3" 0.225
     getETR po >>= assertEqual "etr 2" 44
     getETA po >>= assertEqual "eta 2" 444
 
+test_callback :: IO ()
 test_callback =
   do
     (po, _) <- setup
     mcounter <- newMVar (0 :: Int)
-    mcounter1 <- newMVar (0 :: Int)
+    _mcounter1 <- newMVar (0 :: Int)
     mcounter2 <- newMVar (0 :: Int)
     (po2, _) <- setup
-    (po3, _) <- setup
+    (_po3, _) <- setup
 
     addCallback po (minc mcounter)
     addParent po po2
@@ -156,6 +163,7 @@ test_callback =
   where
     minc mv _ _ = modifyMVar_ mv (\x -> return $ x + 1)
 
+tests :: Test
 tests =
   TestList
     [ TestLabel "incrP" (TestCase test_incrP),

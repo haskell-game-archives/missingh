@@ -12,14 +12,15 @@ import Data.List
 import Data.MIME.Types
 import Test.HUnit
 
+test_readMIMETypes :: [Test]
 test_readMIMETypes =
   let omtd = readMIMETypes defaultmtd True "testsrc/mime.types.test"
-      f = \strict inp exp -> TestCase $ do
+      f = \strict inp exp' -> TestCase $ do
         mtd <- omtd
-        exp @=? guessType mtd strict inp
-      fe = \strict inp exp -> TestCase $ do
+        exp' @=? guessType mtd strict inp
+      fe = \strict inp exp' -> TestCase $ do
         mtd <- omtd
-        (sort exp) @=? sort (guessAllExtensions mtd strict inp)
+        (sort exp') @=? sort (guessAllExtensions mtd strict inp)
    in [ f True "foo.bar.baz" (Nothing, Nothing),
         f True "" (Nothing, Nothing),
         f True "foo.ez" (Just "application/andrew-inset", Nothing),
@@ -31,8 +32,9 @@ test_readMIMETypes =
         f True "foo.tgz" (Just "application/x-tar", Just "gzip")
       ]
 
+test_guessAllExtensions :: [Test]
 test_guessAllExtensions =
-  let f strict inp exp = TestCase $ (sort exp) @=? sort (guessAllExtensions defaultmtd strict inp)
+  let f strict inp exp' = TestCase $ (sort exp') @=? sort (guessAllExtensions defaultmtd strict inp)
    in [ f True "" [],
         f True "foo" [],
         f True "application/octet-stream" [".obj", ".so", ".bin", ".a", ".dll", ".exe", ".o"],
@@ -41,8 +43,9 @@ test_guessAllExtensions =
         f False "application/rtf" [".rtf"]
       ]
 
+test_guessType :: [Test]
 test_guessType =
-  let f strict inp exp = TestCase $ exp @=? guessType defaultmtd strict inp
+  let f strict inp exp' = TestCase $ exp' @=? guessType defaultmtd strict inp
    in [ f True "" (Nothing, Nothing),
         f True "foo" (Nothing, Nothing),
         f True "foo.txt" (Just "text/plain", Nothing),
@@ -57,6 +60,7 @@ test_guessType =
         f False "foo.pict" (Just "image/pict", Nothing)
       ]
 
+tests :: Test
 tests =
   TestList
     [ TestLabel "guessType" (TestList test_guessType),

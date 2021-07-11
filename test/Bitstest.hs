@@ -12,9 +12,10 @@ import Data.Bits.Utils
 import Data.Word
 import Test.HUnit
 
+test_fromBytes :: [Test]
 test_fromBytes =
   let f :: [Word32] -> Word32 -> Test
-      f inp exp = TestCase $ exp @=? fromBytes inp
+      f inp exp' = TestCase $ exp' @=? fromBytes inp
    in [ f [] 0,
         f [0] 0,
         f [1] 1,
@@ -25,9 +26,10 @@ test_fromBytes =
         f [0xff, 0, 0, 0] 0xff000000
       ]
 
+test_getBytes :: [Test]
 test_getBytes =
   let f :: Word32 -> [Word32] -> Test
-      f inp exp = TestCase $ exp @=? getBytes inp
+      f inp exp' = TestCase $ exp' @=? getBytes inp
    in [ f 0 [0, 0, 0, 0],
         f 0x1200 [0, 0, 0x12, 0],
         f 0x0012 [0, 0, 0, 0x12],
@@ -36,6 +38,7 @@ test_getBytes =
         f 0xf0000000 [0xf0, 0, 0, 0]
       ]
 
+tests :: Test
 tests =
   TestList
     [ TestLabel "getBytes" (TestList test_getBytes),
