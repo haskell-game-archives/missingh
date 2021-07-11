@@ -32,13 +32,10 @@ module Data.Compression.Inflate (inflate_string,
                                      inflate, Output, Bit,
                                     bits_to_word32) where
 
-import           Control.Applicative
 import           Control.Monad
 import           Data.Array
 import qualified Data.Char
 import           Data.List
-import           Data.Maybe
-
 import           Data.Bits
 import           Data.Word
 

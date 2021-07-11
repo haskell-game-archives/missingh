@@ -38,7 +38,8 @@ module System.FileArchive.GZip (
                                  )
     where
 
-import           Control.Monad.Error
+import Control.Monad.Error
+import Control.Monad.Trans.Except
 import           Data.Bits                ((.&.))
 import           Data.Bits.Utils          (fromBytes)
 import           Data.Char                (ord)
@@ -52,10 +53,6 @@ data GZipError = CRCError               -- ^ CRC-32 check failed
                | UnknownMethod          -- ^ Compressed with something other than method 8 (deflate)
                | UnknownError String    -- ^ Other problem arose
                deriving (Eq, Show)
-
-instance Error GZipError where
-    noMsg = UnknownError ""
-    strMsg = UnknownError
 
 -- | First two bytes of file
 magic :: String
@@ -176,9 +173,9 @@ read_section s =
 read_data :: String -> (String, Word32, String)
 read_data x =
     let (decompressed1, remainder) = inflate_string_remainder x
-        (decompressed, crc32) = read_data_internal decompressed1 0
+        (decompressed, crc32') = read_data_internal decompressed1 0
         in
-          (decompressed, crc32, remainder)
+          (decompressed, crc32', remainder)
     where
       read_data_internal [] ck = ([], ck)
       read_data_internal (y:ys) ck =
@@ -194,26 +191,26 @@ read_data x =
 read_header :: String -> Either GZipError (Header, String)
 read_header s =
     let ok = Right "ok" in
-    do let (mag, rem) = splitAt 2 s
-       if mag /= magic
+    do let (mag, rem') = splitAt 2 s
+       _ <- if mag /= magic
           then throwError NotGZIPFile
           else ok
-       let (method, rem2) = split1 rem
-       if (ord(method) /= 8)
-          then throwError UnknownMethod
-          else ok
+       let (method', rem2) = split1 rem'
+       _ <- if (ord(method') /= 8)
+              then throwError UnknownMethod
+              else ok
        let (flag_S, rem3) = split1 rem2
        let flag = ord flag_S
        let (mtimea, rem3a) = splitAt 4 rem3
-       let mtime = parseword mtimea
+       let mtime' = parseword mtimea
        let (xfla, rem3b) = split1 rem3a
-       let xfl = ord xfla
+       let xfl' = ord xfla
        let (osa, _) = split1 rem3b
-       let os = ord osa
+       let os' = ord osa
        -- skip modtime (4), extraflag (1), and os (1)
        let rem4 = drop 6 rem3
 
-       let (extra, rem5) =
+       let (extra', rem5) =
                if (flag .&. fFEXTRA /= 0)
                -- Skip past the extra field if we have it.
                   then let (xlen_S, _) = split1 rem4
@@ -223,14 +220,14 @@ read_header s =
                            in (Just ex, rrem)
                   else (Nothing, rem4)
 
-       let (filename, rem6) =
+       let (filename', rem6) =
                if (flag .&. fFNAME /= 0)
                -- Skip past the null-terminated filename
                   then let fn = takeWhile (/= '\x00') rem5
                                 in (Just fn, drop ((length fn) + 1) rem5)
                   else (Nothing, rem5)
 
-       let (comment, rem7) =
+       let (comment', rem7) =
                if (flag .&. fFCOMMENT /= 0)
                   -- Skip past the null-terminated comment
                   then let cm = takeWhile (/= '\x00') rem6
@@ -242,14 +239,14 @@ read_header s =
                   then return $ drop 2 rem7
                   else return rem7
 
-       return (Header {method = ord method,
+       return (Header {method = ord method',
                       flags = flag,
-                      extra = extra,
-                      filename = filename,
-                      comment = comment,
-                      mtime = mtime,
-                      xfl = xfl,
-                      os = os}, rem8)
+                      extra = extra',
+                      filename = filename',
+                      comment = comment',
+                      mtime = mtime',
+                      xfl = xfl',
+                      os = os'}, rem8)
 
 ----------------------------------------------------------------------
 -- Documentation

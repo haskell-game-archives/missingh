@@ -1,4 +1,7 @@
 {-# LANGUAGE Safe #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-
 Copyright (c) 2006-2011 John Goerzen <jgoerzen@complete.org>
 
@@ -139,9 +142,6 @@ class ProgressStatuses a b where
        to the function. -}
     withStatus :: a -> (ProgressStatus -> b) -> b
 
-class ProgressRecords a b where
-    withRecord :: a -> (ProgressRecord -> b) -> b
-
 {-
 instance ProgressStatuses ProgressRecord b where
     withStatus x func = func (status x)
@@ -151,8 +151,6 @@ instance ProgressRecords ProgressRecord b where
 
 instance ProgressStatuses Progress (IO b) where
     withStatus (Progress x) func = withMVar x (\y -> func (status y))
-instance ProgressRecords Progress (IO b) where
-    withRecord (Progress x) func = withMVar x func
 
 instance ProgressStatuses ProgressStatus b where
     withStatus x func = func x
@@ -318,12 +316,12 @@ that it can take either a 'Progress' or a 'ProgressStatus' object, and returns
 a number that is valid as any Fractional type, such as a Double, Float, or
 Rational. -}
 getSpeed :: (ProgressStatuses a (IO b), Fractional b) => a -> IO b
-getSpeed po = withStatus po $ \status -> 
-                do t <- timeSource status
-                   let elapsed = t - (startTime status)
+getSpeed po = withStatus po $ \status' -> 
+                do t <- timeSource status'
+                   let elapsed = t - (startTime status')
                    return $ if elapsed == 0
                        then fromRational 0
-                       else fromRational ((completedUnits status) % elapsed)
+                       else fromRational ((completedUnits status') % elapsed)
 
 {- | Returns the estimated time remaining, in standard time units. 
 
@@ -340,8 +338,8 @@ getETR po =
           else 
               -- FIXME: potential for a race condition here, but it should
               -- be negligible
-              withStatus po $ \status ->
-                  do let remaining = totalUnits status - completedUnits status
+              withStatus po $ \status' ->
+                  do let remaining = totalUnits status' - completedUnits status'
                      return $ round $ (toRational remaining) / speed
 
 {- | Returns the estimated system clock time of completion, in standard
@@ -354,8 +352,8 @@ getETA :: (ProgressStatuses a (IO Integer),
 getETA po =
     do etr <- getETR po
        -- FIXME: similar race potential here
-       withStatus po $ \status ->
-           do timenow <- timeSource status
+       withStatus po $ \status' ->
+           do timenow <- timeSource status'
               return $ timenow + etr
 
 ----------------------------------------------------------------------
@@ -367,9 +365,6 @@ getETA po =
 -}
 defaultTimeSource :: ProgressTimeSource
 defaultTimeSource = getClockTime >>= (return . clockTimeToEpoch)
-
-now :: ProgressRecords a ProgressTimeSource => a -> ProgressTimeSource
-now x = withRecord x (timeSource . status)
 
 modStatus :: Progress -> (ProgressStatus -> ProgressStatus) -> IO ()
 -- FIXME/TODO: handle parents

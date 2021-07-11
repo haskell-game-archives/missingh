@@ -26,7 +26,6 @@ module Data.Hash.CRC32.GZip where
 import           Data.Array
 import           Data.Bits
 import           Data.Char
-import           Data.List
 import           Data.Word
 
 update_crc :: Word32 -> Char -> Word32

@@ -7,18 +7,20 @@ For license and copyright information, see the file LICENSE
 
 -}
 
-module Str.CSVtest(tests) where
-import Test.HUnit
+module Str.CSVtest (tests) where
+
 import Data.CSV
+import Test.HUnit
 import Text.ParserCombinators.Parsec
 
 test_csv =
-    let f inp exp = TestLabel inp $ TestCase $ 
-                    exp @=? case parse csvFile "" inp of
-                                  Right x -> Right x
-                                  Left y -> Left (show y)
-        in [
-        f "" (Right []),
+  let f inp exp =
+        TestLabel inp $
+          TestCase $
+            exp @=? case parse csvFile "" inp of
+              Right x -> Right x
+              Left y -> Left (show y)
+   in [ f "" (Right []),
         f "\n" (Right [[""]]),
         f "1,2,3\n" (Right [["1", "2", "3"]]),
         f "This is a,Test,Really\n" (Right [["This is a", "Test", "Really"]]),
@@ -27,7 +29,6 @@ test_csv =
         f "1Q,\"\"\"\"\n" (Right [["1Q", "\""]]),
         f ",\"\"\n" (Right [["", ""]]),
         f "\"Embedded\"\"Quote\"\n" (Right [["Embedded\"Quote"]])
-        ]
+      ]
 
 tests = TestList [TestLabel "csv" (TestList test_csv)]
-
