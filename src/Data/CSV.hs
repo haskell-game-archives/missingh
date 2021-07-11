@@ -22,13 +22,14 @@ For license and copyright information, see the file LICENSE
 -- Written by John Goerzen, jgoerzen\@complete.org
 module Data.CSV (csvFile, genCsvFile) where
 
-import Data.List (intersperse)
+import Data.List
 import Text.ParserCombinators.Parsec
 
 eol :: forall st. GenParser Char st String
-eol =
-  (try $ string "\n\r") <|> (try $ string "\r\n") <|> string "\n"
-    <|> string "\r" <?> "End of line"
+eol = try (string "\n\r")
+  <|> try (string "\r\n")
+  <|> string "\n"
+  <|> string "\r" <?> "End of line"
 
 cell :: GenParser Char st String
 cell = quotedcell <|> many (noneOf ",\n\r")
@@ -36,9 +37,9 @@ cell = quotedcell <|> many (noneOf ",\n\r")
 quotedchar :: GenParser Char st Char
 quotedchar =
   noneOf "\""
-    <|> ( try $ do
-            _ <- string "\"\""
-            return '"'
+    <|> try ( do
+                _ <- string "\"\""
+                return '"'
         )
 
 quotedcell :: CharParser st String
@@ -93,15 +94,17 @@ csvFile = endBy line eol
 -- | Generate CSV data for a file.  The resulting string can be
 -- written out to disk directly.
 genCsvFile :: [[String]] -> String
-genCsvFile inp =
-  unlines . map csvline $ inp
+genCsvFile = unlines . map csvline
   where
     csvline :: [String] -> String
-    csvline l = concat . intersperse "," . map csvcells $ l
+    csvline = intercalate "," . map csvcells
+
     csvcells :: String -> String
     csvcells "" = ""
     csvcells c = '"' : convcell c ++ "\""
+
     convcell :: String -> String
     convcell c = concatMap convchar c
+
     convchar '"' = "\"\""
     convchar x = [x]

@@ -103,16 +103,16 @@ packLargeFirst' :: BinPacker
 packLargeFirst' _ [] = Right []                     -- Ran out of sizes
 packLargeFirst' [] remainder = Left (BPTooFewBins remainder)
 packLargeFirst' (thisbinsize:otherbins) sizes =
-    let fillBin _ [] = Right []
-        fillBin accumsize sizelist =
-            case break (\x -> (fst x) + accumsize <= thisbinsize) sizelist of
-              (_, []) ->
-                  if accumsize == 0
-                     then Left $ BPSizeTooLarge thisbinsize (head sizelist)
-                     else Right []
-              (nonmatches, ((s, o):matchxs)) ->
-                  do next <- fillBin (accumsize + s) (nonmatches ++ matchxs)
-                     return $ (s, o) : next
-        in do thisset <- fillBin 0 sizes
-              next <- packLargeFirst' otherbins (drop (length thisset) sizes)
-              return (thisset : next)
+  let fillBin _ [] = Right []
+      fillBin accumsize sizelist =
+          case break (\x -> fst x + accumsize <= thisbinsize) sizelist of
+            (_, []) ->
+                if accumsize == 0
+                    then Left $ BPSizeTooLarge thisbinsize (head sizelist)
+                    else Right []
+            (nonmatches, (s, o):matchxs) -> do
+              next <- fillBin (accumsize + s) (nonmatches ++ matchxs)
+              return $ (s, o) : next
+      in do thisset <- fillBin 0 sizes
+            next <- packLargeFirst' otherbins (drop (length thisset) sizes)
+            return (thisset : next)
