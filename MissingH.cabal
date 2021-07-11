@@ -1,66 +1,97 @@
-cabal-version: 1.12
-name: MissingH
-version: 1.4.3.0
-
-build-type: Simple
-license: BSD3
-author: John Goerzen
-copyright: Copyright (c) 2004-2018 John Goerzen
-maintainer: Herbert Valerio Riedel <hvr@gnu.org>
-license-file: LICENSE
-tested-with: GHC==8.6.5, GHC==8.4.4, GHC==8.2.2, GHC==8.0.2, GHC==7.10.3, GHC==7.8.4, GHC==7.6.3, GHC==7.4.2
-
-synopsis: Large utility library
+cabal-version:      2.4
+name:               MissingH
+version:            1.4.4.0
+build-type:         Simple
+license:            BSD-3-Clause
+author:             John Goerzen
+copyright:          Copyright (c) 2004-2018 John Goerzen
+maintainer:         Herbert Valerio Riedel <hvr@gnu.org>
+license-file:       LICENSE
+tested-with:        GHC ==8.6.5 || ==8.8.4 || ==8.10.5 || ==9.0.1
+synopsis:           Large utility library
 description:
   @MissingH@ is a library of all sorts of utility functions for Haskell
   programmers.  It is written in pure Haskell and thus should be
   extremely portable and easy to use.
-category: Unclassified
-bug-reports: https://github.com/hvr/missingh/issues
 
+category:           Unclassified
+bug-reports:        https://github.com/hvr/missingh/issues
 extra-source-files:
-  CHANGES.md
-  LICENSE
-  announcements/0.10.0.txt
-  announcements/0.8.0.txt
-  announcements/0.9.0.txt
-  testsrc/gzfiles/empty.gz
-  testsrc/gzfiles/t1.gz
-  testsrc/gzfiles/t1bad.gz
-  testsrc/gzfiles/t2.gz
-  testsrc/gzfiles/zeros.gz
-  testsrc/mime.types.test
   3rd-party-licenses/BSD
   3rd-party-licenses/LGPL-2.1
+  CHANGES.md
   examples/simplegrep.hs
   examples/test2.hs
   examples/test3.hs
+  LICENSE
+  test/gzfiles/empty.gz
+  test/gzfiles/t1.gz
+  test/gzfiles/t1bad.gz
+  test/gzfiles/t2.gz
+  test/gzfiles/zeros.gz
+  test/mime.types.test
 
 flag network--GE-3_0_0
-  description: [network](http://hackage.haskell.org/package/network) ≥ 3.0.0
-  default: True
-  manual: False
+  description:
+    [network](http://hackage.haskell.org/package/network) ≥ 3.0.0
+
+  default:     True
+  manual:      False
 
 source-repository head
-  type: git
+  type:     git
   location: https://github.com/hvr/missingh.git
 
+common common
+  build-depends:
+    , base          >=4.12 && <4.16
+    , containers    ^>=0.6
+    , directory     ^>=1.3
+    , filepath      ^>=1.4
+    , old-time      ^>=1.1
+    , parsec        ^>=3.1
+    , regex-compat  ^>=0.95
+    , time          ^>=1.8
+
+  if !os(windows)
+    build-depends: unix ^>=2.7
+
+  ghc-options:      -Wall
+  default-language: Haskell2010
+
 library
-  hs-source-dirs: src
+  import:             common
+  hs-source-dirs:     src
+  build-depends:
+    , array       ^>=0.5
+    , hslogger    ^>=1.2
+    , mtl         ^>=2.2
+    , old-locale  ^>=1.0
+    , process     ^>=1.6
+
+  if flag(network--ge-3_0_0)
+    build-depends:
+      , network      ^>=3.0
+      , network-bsd  ^>=2.8
+
+  else
+    build-depends: network ^>=2.8
+
+  -- cabal-fmt: expand src
   exposed-modules:
     Control.Concurrent.Thread.Utils
     Data.BinPacking
     Data.Bits.Utils
-    Data.CSV
     Data.Compression.Inflate
+    Data.CSV
     Data.Either.Utils
     Data.Hash.CRC32.GZip
     Data.Hash.MD5
     Data.Hash.MD5.Zord64_HARD
     Data.List.Utils
-    Data.MIME.Types
     Data.Map.Utils
     Data.Maybe.Utils
+    Data.MIME.Types
     Data.Progress.Meter
     Data.Progress.Tracker
     Data.Quantity
@@ -94,7 +125,6 @@ library
     System.Time.Utils
     Text.ParserCombinators.Parsec.Utils
 
-  default-language: Haskell2010
   default-extensions:
     ExistentialQuantification
     FlexibleContexts
@@ -104,91 +134,43 @@ library
     Rank2Types
     ScopedTypeVariables
     UndecidableInstances
+
   other-extensions:
     CPP
     Safe
     Trustworthy
     TypeSynonymInstances
 
-  build-depends:
-      array               >= 0.4.0.0 && < 0.6
-    , base                >= 4.5.0.0 && < 4.15
-    , containers          >= 0.4.2.1 && < 0.7
-    , directory           >= 1.1.0.2 && < 1.4
-    , filepath            >= 1.3.0.0 && < 1.5
-    , hslogger            >= 1.3.0.0 && < 1.4
-    , mtl                 >= 1.1.1.0 && < 2.3
-    , old-locale          == 1.0.*
-    , old-time            == 1.1.*
-    , parsec              == 3.1.*   && (< 3.1.12 || >= 3.1.13)
-    , process             >= 1.1.0.1 && < 1.7
-    , random              >= 1.0.1.1 && < 1.2
-    , regex-compat        >= 0.95.1  && < 0.96
-    , time                >= 1.4     && < 1.10
-
-  if flag(network--GE-3_0_0)
-    build-depends: network-bsd >= 2.8.1 && <2.9,
-                   network >= 3.0 && <3.2
-  else
-    build-depends: network >= 2.6.3.1 && <2.9
-
-  If !os(windows)
-    Build-Depends: unix   >= 2.5.1.0 && < 2.8
-
-  ghc-options: -fno-warn-deprecations
-
 ----------------------------------------------------------------------------
 
 test-suite runtests
-  type: exitcode-stdio-1.0
+  import:         common
+  type:           exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is:        runtests.hs
+  build-depends:
+    , errorcall-eq-instance  ^>=0.3
+    , HUnit                  ^>=1.6
+    , MissingH
 
-  hs-source-dirs: testsrc
-  main-is: runtests.hs
+  -- cabal-fmt: expand test
   other-modules:
-    TestUtils
-
     Bitstest
     CRC32GZIPtest
     Eithertest
-    GZiptest
     Globtest
+    GZiptest
     HVFStest
     HVIOtest
     IOtest
     Listtest
-    MIMETypestest
     Maptest
+    MIMETypestest
     Pathtest
     ProgressTrackertest
     Str.CSVtest
     Strtest
     Tests
+    TestUtils
     Timetest
     WildMatchtest
-
-  default-language: Haskell2010
-
-  -- intra-package dependency
-  build-depends: MissingH
-
-  -- deps with version bounds inherited via lib:MissingH component
-  build-depends:
-      base
-    , containers
-    , directory
-    , filepath
-    , old-time
-    , parsec
-    , regex-compat
-    , time
-
-  if !os(windows)
-    build-depends: unix
-
-  -- additional testsuite-specific dependencies
-  build-depends:
-      HUnit                  == 1.6.*
---  , QuickCheck             == 2.7.*
-    , errorcall-eq-instance  == 0.3.*
-
-  ghc-options: -fno-warn-deprecations
