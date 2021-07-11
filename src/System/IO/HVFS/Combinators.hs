@@ -130,7 +130,7 @@ fp2dch (HVFSChroot fp h) locfp = do
             "Local path is not subdirectory of parent path"
             (Just newpath)
     else let newpath2 = drop (length fp) newpath
-          in return $ normalise_path ([pathSeparator] ++ newpath2)
+          in return $ normalisePath (pathSeparator : newpath2)
 
 dch2fph :: (HVFS t) => (t -> String -> IO t1) -> HVFSChroot t -> [Char] -> IO t1
 dch2fph func fh@(HVFSChroot _ h) locfp = do

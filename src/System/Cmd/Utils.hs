@@ -491,7 +491,7 @@ pOpen3 :: Maybe Fd                      -- ^ Send stdin to this fd
 pOpen3 pin pout perr fp args func childfunc = do
   pid <- pOpen3Raw pin pout perr fp args childfunc
   retval <- func $! pid
-  let rv = seq retval retval
+  let rv = retval
   forceSuccess (PipeHandle (seq retval pid) fp args "pOpen3")
   return rv
 #endif

@@ -85,8 +85,8 @@ absNormPath ::
   -- | Result
   Maybe String
 absNormPath base thepath =
-  let abs' = absolute_path_by base thepath
-   in case guess_dotdot (normalise_path abs') of
+  let abs' = absolutePathBy base thepath
+   in case guessDotdot (normalisePath abs') of
         Just "." -> Just [pathSeparator]
         x -> x
 

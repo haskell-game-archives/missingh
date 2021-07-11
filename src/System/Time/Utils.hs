@@ -1,4 +1,3 @@
-{-# LANGUAGE Safe #-}
 {- arch-tag: Time utilities main file
 Copyright (c) 2004-2011 John Goerzen <jgoerzen@complete.org>
 
@@ -36,10 +35,20 @@ import           System.Time
 
 {- | January 1, 1970, midnight, UTC, represented as a CalendarTime. -}
 epoch :: CalendarTime
-epoch = CalendarTime { ctYear = 1970, ctMonth = January,
-                       ctDay = 1, ctHour = 0, ctMin = 0, ctSec = 0,
-                       ctPicosec = 0, ctWDay = Thursday, ctYDay = 0,
-                       ctTZName = "UTC", ctTZ = 0, ctIsDST = False}
+epoch = CalendarTime
+  { ctYear = 1970
+  , ctMonth = January
+  , ctDay = 1
+  , ctHour = 0
+  , ctMin = 0
+  , ctSec = 0
+  , ctPicosec = 0
+  , ctWDay = Thursday
+  , ctYDay = 0
+  , ctTZName = "UTC"
+  , ctTZ = 0
+  , ctIsDST = False
+  }
 
 {- | Converts the specified CalendarTime (see System.Time) to seconds-since-epoch time.
 
@@ -82,23 +91,24 @@ timelocal ct =
 Uses the same algorithm as normalizeTimeDiff in GHC. -}
 timeDiffToSecs :: TimeDiff -> Integer
 timeDiffToSecs td =
-    (fromIntegral $ tdSec td) +
-    60 * ((fromIntegral $ tdMin td) +
-          60 * ((fromIntegral $ tdHour td) +
-                24 * ((fromIntegral $ tdDay td) +
-                      30 * ((fromIntegral $ tdMonth td) +
-                            365 * (fromIntegral $ tdYear td)))))
+    fromIntegral (tdSec td) +
+    60 * (fromIntegral (tdMin td) +
+          60 * (fromIntegral (tdHour td) +
+                24 * (fromIntegral (tdDay td) +
+                      30 * (fromIntegral (tdMonth td) +
+                            365 * fromIntegral (tdYear td)))))
 
 {- | Converts an Epoch time represented with an arbitrary Real to a ClockTime.
 This input could be a CTime from Foreign.C.Types or an EpochTime from
 System.Posix.Types. -}
 epochToClockTime :: Real a => a -> ClockTime
 epochToClockTime x =
-    TOD seconds secfrac
-    where ratval = toRational x
-          seconds = floor ratval
-          secfrac = floor $ (ratval - (seconds % 1) ) * picosecondfactor
-          picosecondfactor = 10 ^ (12 :: Int)
+  TOD seconds secfrac
+  where
+    ratval = toRational x
+    seconds = floor ratval
+    secfrac = floor $ (ratval - (seconds % 1) ) * picosecondfactor
+    picosecondfactor = 10 ^ (12 :: Int)
 
 {- | Converts a ClockTime to something represented with an arbitrary Real.
 The result could be treated as a CTime from Foreign.C.Types or EpochTime from
@@ -122,13 +132,14 @@ renderSecs i = renderTD $ diffClockTimes (TOD i 0) (TOD 0 0)
 count. -}
 renderTD :: TimeDiff -> String
 renderTD itd =
-    case workinglist of
-      [] -> "0s"
-      _  -> concat . map (\(q, s) -> show q ++ [s]) $ workinglist
-    where td = normalizeTimeDiff itd
-          suffixlist = "yMdhms"
-          quantlist = (\(TimeDiff y mo d h m s _) -> [y, mo, d, h, m, s]) td
-          zippedlist = zip quantlist suffixlist
-          -- Drop all leading elements that are 0, then take at most 2
-          workinglist = take 2 . dropWhile (\(q, _) -> q == 0) $ zippedlist
+  case workinglist of
+    [] -> "0s"
+    _  -> concatMap (\(q, s) -> show q ++ [s]) workinglist
+  where
+    td = normalizeTimeDiff itd
+    suffixlist = "yMdhms"
+    quantlist = (\(TimeDiff y mo d h m s _) -> [y, mo, d, h, m, s]) td
+    zippedlist = zip quantlist suffixlist
+    -- Drop all leading elements that are 0, then take at most 2
+    workinglist = take 2 . dropWhile (\(q, _) -> q == 0) $ zippedlist
 

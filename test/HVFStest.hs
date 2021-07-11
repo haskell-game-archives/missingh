@@ -40,7 +40,7 @@ testTree =
 
 test_nice_slice :: [Test]
 test_nice_slice =
-  let f exp' fp' = TestLabel fp $ TestCase $ exp' @=? nice_slice fp
+  let f exp' fp' = TestLabel fp $ TestCase $ exp' @=? niceSlice fp
         where
           fp = sep fp'
    in [ f [] "/",

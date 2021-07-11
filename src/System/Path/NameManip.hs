@@ -29,51 +29,51 @@ treated like \"@.@\", yielding an empty path components list.
 
 Examples:
 
->slice_path "/"        = ["/"]
->slice_path "/foo/bar" = ["/foo","bar"]
->slice_path "..//./"   = [".."]
->slice_path "."        = []
+>slicePath "/"        = ["/"]
+>slicePath "/foo/bar" = ["/foo","bar"]
+>slicePath "..//./"   = [".."]
+>slicePath "."        = []
 
-See 'unslice_path', 'realpath', 'realpath_s'.
+See 'unslicePath', 'realpath', 'realpath_s'.
 -}
-slice_path :: String    -- ^ The path to be broken to components.
+slicePath :: String    -- ^ The path to be broken to components.
            -> [String]  -- ^ List of path components.
-slice_path "" = []
-slice_path (c:cs) = if isPathSeparator c
-                       then case slice_path' cs of
+slicePath "" = []
+slicePath (c:cs) = if isPathSeparator c
+                       then case slicePath' cs of
                            []     -> [[c]]
                            (p:ps) -> (c:p):ps
-                       else slice_path' (c:cs)
+                       else slicePath' (c:cs)
     where
-      slice_path' o = filter (\c' -> c' /= "" && c' /= ".") (split o)
+      slicePath' o = filter (\c' -> c' /= "" && c' /= ".") (split o)
 
       split xs = unfoldr f xs
         where
           f "" = Nothing
-          f xs' = Just $ fmap tail' $ break isPathSeparator xs'
+          f xs' = Just (tail' <$> break isPathSeparator xs')
           tail' [] = []
           tail' xs' = tail xs'
 
 {- | Form a path from path components. This isn't the inverse
-of 'slice_path', since @'unslice_path' . 'slice_path'@
+of 'slicePath', since @'unslicePath' . 'slicePath'@
 normalises the path.
 
-See 'slice_path'.
+See 'slicePath'.
 -}
-unslice_path :: [String]        -- ^ List of path components
+unslicePath :: [String]        -- ^ List of path components
              -> String          -- ^ The path which consists of the supplied path components
-unslice_path [] = "."
-unslice_path cs = intercalate [pathSeparator] cs
+unslicePath [] = "."
+unslicePath cs = intercalate [pathSeparator] cs
 
 
 {- | Normalise a path. This is done by reducing repeated @\/@ characters to one, and removing
 @.@ path components. @..@ path components are left intact, because of possible symlinks.
 
-@'normalise_path' = 'unslice_path' . 'slice_path'@
+@'normalisePath' = 'unslicePath' . 'slicePath'@
 -}
-normalise_path :: String        -- ^ Path to be normalised
+normalisePath :: String        -- ^ Path to be normalised
                -> String        -- ^ Path in normalised form
-normalise_path = unslice_path . slice_path
+normalisePath = unslicePath . slicePath
 
 
 {- | Split a file name in components. This are the base file name and the
@@ -89,7 +89,7 @@ component.
 
 Concateneting the name components and adding dots, reproduces the
 original name, with a normalised path:
-@concat . intersperse \".\" . 'slice_filename' == 'normalise'@.
+@concat . intersperse \".\" . 'sliceFilename' == 'normalise'@.
 
 Note that the last path component might be \"@..@\". Then it is not
 possible to deduce the refered directory's name from the path. An IO
@@ -98,63 +98,61 @@ action for getting the real path is then necessary.
 Examples:
 
 @
-'slice_filename' \"a.b\/\/.\/.foo.tar.gz\" == [\"a.b\/.foo\",\"tar\",\"gz\"]
-'slice_filename' \".x..y.\"             == [\".x.\", \"y.\"]
+'sliceFilename' \"a.b\/\/.\/.foo.tar.gz\" == [\"a.b\/.foo\",\"tar\",\"gz\"]
+'sliceFilename' \".x..y.\"             == [\".x.\", \"y.\"]
 @
 
-See 'unslice_filename', @slice_filename\'@.
+See 'unsliceFilename', @sliceFilename\'@.
 -}
-slice_filename :: String        -- ^ Path
+sliceFilename :: String        -- ^ Path
                -> [String]      -- ^ List of components the file name is made up of
-slice_filename path =
-   let comps = slice_path path
-   in if comps == []
-         then []
-         else -- slice_filename' result not empty, because comps not empty
-              let (base:suffixes) = slice_filename' (last comps)
-              in (unslice_path (init comps ++ [base]) : suffixes)
+sliceFilename path =
+  let comps = slicePath path
+  in if null comps
+        then []
+        else -- sliceFilename' result not empty, because comps not empty
+            let (base:suffixes) = sliceFilename' (last comps)
+            in (unslicePath (init comps ++ [base]) : suffixes)
 
 
-{- | This is a variant of 'slice_filename'. It is like 'slice_filename', except for
+{- | This is a variant of 'sliceFilename'. It is like 'sliceFilename', except for
 being more efficient, and the filename must not contain any preceding path,
 since this case isn't considered.
 
-See 'slice_filename', 'unslice_filename'.
+See 'sliceFilename', 'unsliceFilename'.
 -}
-slice_filename' :: String        -- ^ File name without path
+sliceFilename' :: String        -- ^ File name without path
                 -> [String]      -- ^ List of components the file name is made up of
-slice_filename' filename =
-   case filename of
-     ('.':filename') -> case slice_filename'' filename' of
-                           []     -> ["."]
-                           (t:ts) -> ('.':t) : ts
-     filename' -> slice_filename'' filename'
-   where
-      slice_filename'' :: String -> [String]
-      slice_filename'' "" = []
-      slice_filename'' fn =
-         let (beg,rest) = split1 fn
-         in  (beg : slice_filename'' rest)
+sliceFilename' filename =
+  case filename of
+    ('.':filename') -> case sliceFilename'' filename' of
+                          []     -> ["."]
+                          (t:ts) -> ('.':t) : ts
+    filename' -> sliceFilename'' filename'
+  where
+    sliceFilename'' :: String -> [String]
+    sliceFilename'' "" = []
+    sliceFilename'' fn =
+        let (beg,rest) = split1 fn
+        in  (beg : sliceFilename'' rest)
 
-      split1 :: String -> (String, String)
-      split1 (x:y:r) =
-         if x == '.' && y /= '.' then ("", y:r)
-                                 else let (beg,rest) = split1 (y:r)
-                                      in  (x:beg,rest)
-      split1 str = (str, "")
-
-
+    split1 :: String -> (String, String)
+    split1 (x:y:r) =
+        if x == '.' && y /= '.' then ("", y:r)
+                                else let (beg,rest) = split1 (y:r)
+                                    in  (x:beg,rest)
+    split1 str = (str, "")
 
 {- | Form file name from file name components, interspersing dots. This is
-the inverse of 'slice_filename', except for normalisation of any path.
+the inverse of 'sliceFilename', except for normalisation of any path.
 
-> unslice_filename = concat . intersperse "."
+> unsliceFilename = concat . intersperse "."
 
-See 'slice_filename'.
+See 'sliceFilename'.
 -}
-unslice_filename :: [String]    -- ^ List of file name components
+unsliceFilename :: [String]    -- ^ List of file name components
                  -> String      -- ^ Name of the file which consists of the supplied components
-unslice_filename = intercalate "."
+unsliceFilename = intercalate "."
 
 
 {- | Split a path in directory and file name. Only in the case that the
@@ -163,7 +161,7 @@ for the corresponding part, if necessary. Unless the path is empty,
 concatenating the returned path and file name components with a slash in
 between, makes a valid path to the file.
 
-@split_path@ splits off the last path component. This
+@splitPath@ splits off the last path component. This
 isn't the same as the text after the last @\/@.
 
 Note that the last path component might be @\"..\"@. Then it is not
@@ -172,87 +170,87 @@ action for getting the real path is necessary.
 
 Examples:
 
->split_path "/a/b/c"      == ("/a/b", "c")
->split_path "foo"         == (".", "foo")
->split_path "foo/bar"     == ("foo", "bar")
->split_path "foo/.."      == ("foo", "..")
->split_path "."           == (".", ".")
->split_path ""            == ("", "")
->split_path "/foo"        == ("/", "foo")
->split_path "foo/"        == (".", "foo")
->split_path "foo/."       == (".", "foo")
->split_path "foo///./bar" == ("foo", "bar")
+>splitPath "/a/b/c"      == ("/a/b", "c")
+>splitPath "foo"         == (".", "foo")
+>splitPath "foo/bar"     == ("foo", "bar")
+>splitPath "foo/.."      == ("foo", "..")
+>splitPath "."           == (".", ".")
+>splitPath ""            == ("", "")
+>splitPath "/foo"        == ("/", "foo")
+>splitPath "foo/"        == (".", "foo")
+>splitPath "foo/."       == (".", "foo")
+>splitPath "foo///./bar" == ("foo", "bar")
 
-See 'slice_path'.
+See 'slicePath'.
 -}
-split_path :: String            -- ^ Path to be split
+splitPath :: String            -- ^ Path to be split
            -> (String, String)  -- ^ Directory and file name components of the path. The directory path is normalized.
-split_path "" = ("","")
-split_path path =
-   case slice_path path of
+splitPath "" = ("","")
+splitPath path =
+   case slicePath path of
       []     -> (".", ".")
       [""]   -> (".", "")
       [f:fs] -> if isPathSeparator f then ([pathSeparator], fs) else (".", f:fs)
-      parts  -> ( unslice_path (init parts)
+      parts  -> ( unslicePath (init parts)
                 , last parts
                 )
 
 {- | Get the directory part of a path.
 
->dir_part = fst . split_path
+>dirPart = fst . splitPath
 
-See 'split_path'.
+See 'splitPath'.
 -}
-dir_part :: String -> String
-dir_part = fst . split_path
+dirPart :: String -> String
+dirPart = fst . splitPath
 
 
 {- | Get the last path component of a path.
 
->filename_part = snd . split_path
+>filenamePart = snd . splitPath
 
 Examples:
 
->filename_part "foo/bar" == "bar"
->filename_part "."       == "."
+>filenamePart "foo/bar" == "bar"
+>filenamePart "."       == "."
 
-See 'split_path'.
+See 'splitPath'.
 -}
-filename_part :: String -> String
-filename_part = snd . split_path
+filenamePart :: String -> String
+filenamePart = snd . splitPath
 
 
-{- | Inverse of 'split_path', except for normalisation.
+{- | Inverse of 'splitPath', except for normalisation.
 
-This concatenates two paths, and takes care of @\".\"@ and empty paths. When the two components are the result of @split_path@, then @unsplit_path@
+This concatenates two paths, and takes care of @\".\"@ and empty paths. When the two components are the result of @splitPath@, then @unsplitPath@
 creates a normalised path. It is best documented by its definition:
 
->unsplit_path (".", "") = "."
->unsplit_path ("", ".") = "."
->unsplit_path (".", q)  = q
->unsplit_path ("", q)   = q
->unsplit_path (p, "")   = p
->unsplit_path (p, ".")  = p
->unsplit_path (p, q)    = p ++ "/" ++ q
+>unsplitPath (".", "") = "."
+>unsplitPath ("", ".") = "."
+>unsplitPath (".", q)  = q
+>unsplitPath ("", q)   = q
+>unsplitPath (p, "")   = p
+>unsplitPath (p, ".")  = p
+>unsplitPath (p, q)    = p ++ "/" ++ q
 
 Examples:
 
->unsplit_path ("", "")     == ""
->unsplit_path (".", "")    == "."
->unsplit_path (".", ".")   == "."
->unsplit_path ("foo", ".") == "foo"
+>unsplitPath ("", "")     == ""
+>unsplitPath (".", "")    == "."
+>unsplitPath (".", ".")   == "."
+>unsplitPath ("foo", ".") == "foo"
 
-See 'split_path'.
+See 'splitPath'.
 -}
-unsplit_path :: ( String, String )  -- ^ Directory and file name
+unsplitPath :: ( String, String )  -- ^ Directory and file name
              -> String          -- ^ Path formed from the directory and file name parts
-unsplit_path (".", "") = "."
-unsplit_path ("", ".") = "."
-unsplit_path (".", q)  = q
-unsplit_path ("", q)   = q
-unsplit_path (p, "")   = p
-unsplit_path (p, ".")  = p
-unsplit_path (p, q)    = p </> q
+unsplitPath (".", "") = "."
+unsplitPath ("", ".") = "."
+unsplitPath (".", q)  = q
+unsplitPath ("", q)   = q
+unsplitPath (p, "")   = p
+unsplitPath (p, ".")  = p
+unsplitPath (p, q)    = p </> q
 
 
 {- | Split a file name in prefix and suffix. If there isn't any suffix in
@@ -272,54 +270,52 @@ dot is mistaken as introducing a suffix.
 
 Examples:
 
->split_filename "path/to/foo.bar"                             = ("path/to/foo","bar")
->split_filename "path/to/foo"                                 = ("path/to/foo","")
->split_filename "/path.to/foo"                                = ("/path.to/foo","")
->split_filename "a///./x"                                     = ("a/x","")
->split_filename "dir.suffix/./"                               = ("dir","suffix")
->split_filename "Photographie, Das 20. Jahrhundert (300 dpi)" = ("Photographie, Das 20", " Jahrhundert (300 dpi)")
+>splitFilename "path/to/foo.bar"                             = ("path/to/foo","bar")
+>splitFilename "path/to/foo"                                 = ("path/to/foo","")
+>splitFilename "/path.to/foo"                                = ("/path.to/foo","")
+>splitFilename "a///./x"                                     = ("a/x","")
+>splitFilename "dir.suffix/./"                               = ("dir","suffix")
+>splitFilename "Photographie, Das 20. Jahrhundert (300 dpi)" = ("Photographie, Das 20", " Jahrhundert (300 dpi)")
 
-See 'slice_path', 'split_filename\''
+See 'slicePath', 'splitFilename\''
 -}
-split_filename :: String                -- ^ Path including the file name to be split
+splitFilename :: String                -- ^ Path including the file name to be split
                -> (String, String)      -- ^ The normalised path with the file prefix, and the file suffix.
-split_filename "" = ("", "")
-split_filename path =
-   case slice_path path of
-      []    -> (".","")
-      comps -> let (pref_fn, suff_fn) = split_filename' (last comps)
-               in ( intercalate [pathSeparator] (init comps ++ [pref_fn])
-                  , suff_fn
-                  )
+splitFilename "" = ("", "")
+splitFilename path =
+  case slicePath path of
+    []    -> (".","")
+    comps -> let (pref_fn, suff_fn) = splitFilename' (last comps)
+              in ( intercalate [pathSeparator] (init comps ++ [pref_fn])
+                , suff_fn
+                )
 
-
-{- | Variant of 'split_filename'. This is a more efficient version
-of 'split_filename', for the case that you know the string is
+{- | Variant of 'splitFilename'. This is a more efficient version
+of 'splitFilename', for the case that you know the string is
 is a pure file name without any slashes.
 
-See 'split_filename'.
+See 'splitFilename'.
 -}
-split_filename' :: String               -- ^ Filename to be split
+splitFilename' :: String               -- ^ Filename to be split
                 -> (String, String)     -- ^ Base name and the last suffix
-split_filename' "" = ("", "")
-split_filename' fn =
-   let parts = slice_filename' fn
-   in case parts of
-         []     -> (".", "")
-         [base] -> (base, "")
-         p      -> (unslice_filename (init p), last p)
+splitFilename' "" = ("", "")
+splitFilename' fn =
+  let parts = sliceFilename' fn
+  in case parts of
+        []     -> (".", "")
+        [base] -> (base, "")
+        p      -> (unsliceFilename (init p), last p)
 
 
-{- | Inverse of 'split_filename'. Concatenate prefix and suffix, adding
+{- | Inverse of 'splitFilename'. Concatenate prefix and suffix, adding
 a dot in between, iff the suffix is not empty. The path part of the prefix is
 normalised.
 
-See 'split_filename'.
+See 'splitFilename'.
 -}
-unsplit_filename :: (String, String)    -- ^ File name prefix and suffix
+unsplitFilename :: (String, String)    -- ^ File name prefix and suffix
                  -> String              -- ^ Path
-unsplit_filename (prefix, suffix) =
-   if suffix == "" then prefix else prefix ++ "." ++ suffix
+unsplitFilename (prefix, suffix) = if suffix == "" then prefix else prefix ++ "." ++ suffix
 
 
 {- | Split a path in directory, base file name and suffix.
@@ -328,9 +324,9 @@ split3 :: String                        -- ^ Path to split
        -> (String, String, String)      -- ^ Directory part, base file name part and suffix part
 split3 "" = ("","","")
 split3 path =
-   let comps = slice_path path
-       (base, suffix) = split_filename' (last comps)
-   in  (unslice_path (init comps), base, suffix)
+  let comps = slicePath path
+      (base, suffix) = splitFilename' (last comps)
+  in  (unslicePath (init comps), base, suffix)
 
 
 {- |
@@ -338,8 +334,7 @@ Form path from directory, base file name and suffix parts.
 -}
 unsplit3 :: (String, String, String)    -- ^ Directory part, base file name part and suffix part
          -> String                      -- ^ Path consisting of dir, base and suffix
-unsplit3 (dir, base, suffix) =
-   unsplit_path (dir, (unsplit_filename (base,suffix)))
+unsplit3 (dir, base, suffix) = unsplitPath (dir, unsplitFilename (base,suffix))
 
 
 {- | Test a path for a specific suffix and split it off.
@@ -352,10 +347,8 @@ test_suffix :: String           -- ^ Suffix to split off
             -> String           -- ^ Path to test
             -> Maybe String     -- ^ Prefix without the suffix or @Nothing@
 test_suffix suffix path =
-    let (prefix, suff) = split_filename path
-    in if suff == suffix then Just prefix
-                         else Nothing
-
+  let (prefix, suff) = splitFilename path
+  in if suff == suffix then Just prefix else Nothing
 
 {- | Make a path absolute, using the current working directory.
 
@@ -366,9 +359,9 @@ The current working directory is determined with @getCurrentDirectory@
 which means that symbolic links in it are expanded and the path is
 normalised. This is different from @pwd@.
 -}
-absolute_path :: String         -- ^ The path to be made absolute
+absolutePath :: String         -- ^ The path to be made absolute
               -> IO String      -- ^ Absulte path
-absolute_path path = fmap (absolute_path' path) getCurrentDirectory
+absolutePath path = fmap (absolutePath' path) getCurrentDirectory
 
 
 {- | Make a path absolute.
@@ -376,10 +369,10 @@ absolute_path path = fmap (absolute_path' path) getCurrentDirectory
 This makes a relative path absolute with respect to a specified
 directory. An absolute path is returned unmodified.
 -}
-absolute_path_by :: String        -- ^ The directory relative to which the path is made absolute
+absolutePathBy :: String        -- ^ The directory relative to which the path is made absolute
                  -> String        -- ^ The path to be made absolute
                  -> String        -- ^ Absolute path
-absolute_path_by = (</>)
+absolutePathBy = (</>)
 
 
 {- | Make a path absolute.
@@ -387,12 +380,12 @@ absolute_path_by = (</>)
 This makes a relative path absolute with respect to a specified
 directory. An absolute path is returned unmodified.
 
-The order of the arguments can be confusing. You should rather use 'absolute_path_by'. @absolute_path\'@ is included for backwards compatibility.
+The order of the arguments can be confusing. You should rather use 'absolutePathBy'. @absolutePath\'@ is included for backwards compatibility.
 -}
-absolute_path' :: String        -- ^ The path to be made absolute
+absolutePath' :: String        -- ^ The path to be made absolute
                -> String        -- ^ The directory relative to which the path is made absolute
                -> String        -- ^ Absolute path
-absolute_path' = flip absolute_path_by
+absolutePath' = flip absolutePathBy
 
 
 {- | Guess the @\"..\"@-component free form of a path, specified as a list of path components, by syntactically removing them, along with the preceding
@@ -400,14 +393,14 @@ absolute_path' = flip absolute_path_by
    erroneous results when the path contains symlinks. If the path contains leading @\"..\"@ components, or more @\"..\"@ components than preceeding normal
    components, then the @\"..\"@ components can't be normalised away. In this case, the result is @Nothing@.
 -}
-guess_dotdot_comps :: [String]          -- ^ List of path components
+guessDotdotComps :: [String]          -- ^ List of path components
                    -> Maybe [String]    -- ^ In case the path could be transformed, the @\"..\"@-component free list of path components.
-guess_dotdot_comps = guess_dotdot_comps' []
+guessDotdotComps = guessDotdotComps' []
    where
-      guess_dotdot_comps' schon [] = Just schon
-      guess_dotdot_comps' [] ("..":_) = Nothing
-      guess_dotdot_comps' schon ("..":teile) = guess_dotdot_comps' (reverse . tail . reverse $ schon) teile
-      guess_dotdot_comps' schon (teil:teile) = guess_dotdot_comps' (schon ++ [teil]) teile
+      guessDotdotComps' schon [] = Just schon
+      guessDotdotComps' [] ("..":_) = Nothing
+      guessDotdotComps' schon ("..":teile) = guessDotdotComps' (init schon) teile
+      guessDotdotComps' schon (teil:teile) = guessDotdotComps' (schon ++ [teil]) teile
 
 
 {- | Guess the @\"..\"@-component free, normalised form of a path. The transformation is purely syntactic. @\"..\"@ path components will be removed, along
@@ -415,9 +408,8 @@ guess_dotdot_comps = guess_dotdot_comps' []
    erroneous results when the path contains symlinks. If the path contains leading @\"..\"@ components, or more @\"..\"@ components than preceeding normal
    components, then the @\"..\"@ components can't be normalised away. In this case, the result is @Nothing@.
 
->guess_dotdot = fmap unslice_path . guess_dotdot_comps . slice_path
+>guessDotdot = fmap unslicePath . guessDotdotComps . slicePath
 -}
-guess_dotdot :: String                  -- ^ Path to be normalised
+guessDotdot :: String                  -- ^ Path to be normalised
              -> Maybe String            -- ^ In case the path could be transformed, the normalised, @\"..\"@-component free form of the path.
-guess_dotdot =
-   fmap unslice_path . guess_dotdot_comps . slice_path
+guessDotdot = fmap unslicePath . guessDotdotComps . slicePath

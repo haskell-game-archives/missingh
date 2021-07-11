@@ -42,6 +42,7 @@ import           System.IO.HVFS
 import           System.IO.HVIO
 import           System.Path
 import           System.Path.NameManip
+import Data.Functor
 
 {- | A simple "System.IO.HVFS.HVFSStat"
 class that assumes that everything is either a file
@@ -100,7 +101,7 @@ niceSlice :: String -> [String]
 niceSlice path
   | path == [pathSeparator] = []
   | otherwise =
-      let sliced1 = slice_path path
+      let sliced1 = slicePath path
           h = head sliced1
           t = tail sliced1
           newh =  if isPathSeparator (head h) then tail h else h
@@ -127,9 +128,9 @@ getFullSlice fs fp =
 -- | Find an element on the tree, assuming a normalized path
 findMelem :: MemoryVFS -> String -> IO MemoryEntry
 findMelem x path
-  | path == [pathSeparator] = readIORef (content x) >>= return . MemoryDirectory
+  | path == [pathSeparator] = readIORef (content x) <&> MemoryDirectory
   | otherwise =
-    let sliced1 = slice_path path
+    let sliced1 = slicePath path
         h = head sliced1
         t = tail sliced1
         newh = if (h /= [pathSeparator]) && isPathSeparator (head h) then tail h else h
@@ -151,18 +152,18 @@ findMelem x path
                       walk newobj (tail zs)
     in do
        c <- readIORef $ content x
-       case walk (MemoryDirectory c) (sliced2) of
+       case walk (MemoryDirectory c) sliced2 of
          Left err     -> vRaiseError x doesNotExistErrorType err Nothing
          Right result -> return result
 
 -- | Find an element on the tree, normalizing the path first
 getMelem :: MemoryVFS -> String -> IO MemoryEntry
-getMelem x s =
-    do base <- readIORef $ cwd x
-       case absNormPath base s of
-           Nothing -> vRaiseError x doesNotExistErrorType
-                        ("Trouble normalizing path " ++ s) (Just s)
-           Just newpath -> findMelem x newpath
+getMelem x s = do
+  base <- readIORef $ cwd x
+  case absNormPath base s of
+      Nothing -> vRaiseError x doesNotExistErrorType
+                  ("Trouble normalizing path " ++ s) (Just s)
+      Just newpath -> findMelem x newpath
 
 instance HVFS MemoryVFS where
   vGetCurrentDirectory x = readIORef $ cwd x
@@ -189,18 +190,12 @@ instance HVFS MemoryVFS where
 
   vGetDirectoryContents x fp = do
     getMelem x fp >>= \case
-      MemoryFile _ -> vRaiseError x doesNotExistErrorType
-                        "Can't list contents of a file"
-                        (Just fp)
+      MemoryFile _ -> vRaiseError x doesNotExistErrorType "Can't list contents of a file" (Just fp)
       MemoryDirectory c -> return $ map fst c
 
 instance HVFSOpenable MemoryVFS where
-  vOpen x fp (ReadMode) = do
+  vOpen x fp ReadMode = do
     getMelem x fp >>= \case
-      MemoryDirectory _ -> vRaiseError x doesNotExistErrorType
-                            "Can't open a directory"
-                            (Just fp)
-      MemoryFile y -> newStreamReader y >>= return . HVFSOpenEncap
-  vOpen x fp _ = vRaiseError x permissionErrorType
-                    "Only ReadMode is supported with MemoryVFS files"
-                    (Just fp)
+      MemoryDirectory _ -> vRaiseError x doesNotExistErrorType "Can't open a directory" (Just fp)
+      MemoryFile y -> (newStreamReader y <&> HVFSOpenEncap)
+  vOpen x fp _ = vRaiseError x permissionErrorType "Only ReadMode is supported with MemoryVFS files" (Just fp)
