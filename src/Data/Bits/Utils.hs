@@ -52,7 +52,7 @@ getBytes input =
 fromBytes :: (Bits a, Num a) => [a] -> a
 fromBytes input =
   let dofb accum [] = accum
-      dofb accum (x : xs) = dofb ((shiftL accum 8) .|. x) xs
+      dofb accum (x : xs) = dofb (shiftL accum 8 .|. x) xs
    in dofb 0 input
 
 -- | Converts a Char to a Word8.

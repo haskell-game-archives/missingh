@@ -1,4 +1,6 @@
 {-# LANGUAGE Safe #-}
+{-# LANGUAGE InstanceSigs #-}
+{-# LANGuAGE TupleSections #-}
 
 -- arch-tag: Inflate implementation for Haskell
 
@@ -27,8 +29,8 @@ as described by RFC 1951.
 --
 -- Copyright (C) 2004 Ian Lynagh
 module Data.Compression.Inflate
-  ( inflate_string,
-    inflate_string_remainder,
+  ( inflateString,
+    inflateStringRemainder,
     inflate,
     Output,
     Bit,
@@ -43,14 +45,12 @@ import qualified Data.Char
 import Data.List
 import Data.Word
 
-inflate_string :: String -> String
-inflate_string = fst . inflate_string_remainder
-
---    map (Data.Char.chr . fromIntegral) $ fst $ inflate $ map Data.Char.ord s
+inflateString :: String -> String
+inflateString = fst . inflateStringRemainder
 
 -- | Returns (Data, Remainder)
-inflate_string_remainder :: String -> (String, String)
-inflate_string_remainder s =
+inflateStringRemainder :: String -> (String, String)
+inflateStringRemainder s =
   let res = inflate $ map Data.Char.ord s
       convw32l l = map (Data.Char.chr . fromIntegral) l
       output = convw32l $ fst res
@@ -92,18 +92,18 @@ newtype Bit = Bit Bool
   deriving (Eq)
 
 instance Show Bit where
-  show = (\x -> [x]) . show_b
-  showList bs = showString $ "'" ++ map show_b bs ++ "'"
+  show = (:[]) . showB
+  showList bs = showString $ "'" ++ map showB bs ++ "'"
 
-show_b :: Bit -> Char
-show_b (Bit True) = '1'
-show_b (Bit False) = '0'
+showB :: Bit -> Char
+showB (Bit True) = '1'
+showB (Bit False) = '0'
 
-int_to_bits :: Int -> [Bit]
-int_to_bits = word8_to_bits . fromIntegral
+intToBits :: Int -> [Bit]
+intToBits = word8_to_bits . fromIntegral
 
 word8_to_bits :: Word8 -> [Bit]
-word8_to_bits n = map (\i -> Bit (testBit n i)) [0 .. 7]
+word8_to_bits n = map (Bit . testBit n) [0 .. 7]
 
 bits_to_word32 :: [Bit] -> Word32
 bits_to_word32 = foldr (\(Bit b) i -> 2 * i + (if b then 1 else 0)) 0
@@ -125,14 +125,14 @@ data State = State
 data InfM a = InfM (State -> (a, State))
 
 instance Monad InfM where
-  -- (>>=)  :: InfM a -> (a -> InfM b) -> InfM b
+  (>>=)  :: InfM a -> (a -> InfM b) -> InfM b
   InfM v >>= f = InfM $ \s ->
     let (x, s') = v s
         InfM y = f x
      in y s'
 
-  -- return :: a -> InfM a
-  return x = InfM $ \s -> (x, s)
+  return :: a -> InfM a
+  return x = InfM (x,)
 
 instance Applicative InfM where
   pure = return
@@ -142,13 +142,8 @@ instance Functor InfM where
   fmap f (InfM g) = InfM $ \s ->
     case g s of ~(a, s') -> (f a, s')
 
-set_bits :: [Bit] -> InfM ()
-set_bits bs = InfM $ const ((), State bs 0 (array (0, 32767) []) 0)
-
-{-
-no_bits :: InfM Bool
-no_bits = InfM $ \s -> (null (bits s), s)
--}
+setBits :: [Bit] -> InfM ()
+setBits bs = InfM $ const ((), State bs 0 (array (0, 32767) []) 0)
 
 align_8_bits :: InfM ()
 align_8_bits =
@@ -160,8 +155,8 @@ align_8_bits =
         }
     )
 
-get_bits :: Word32 -> InfM [Bit]
-get_bits n = InfM $ \s -> case need n (bits s) of
+getBits :: Word32 -> InfM [Bit]
+getBits n = InfM $ \s -> case need n (bits s) of
   (ys, zs) ->
     ( ys,
       s
@@ -171,11 +166,11 @@ get_bits n = InfM $ \s -> case need n (bits s) of
     )
   where
     need 0 xs = ([], xs)
-    need _ [] = error "get_bits: Don't have enough!"
+    need _ [] = error "getBits: Don't have enough!"
     need i (x : xs) = let (ys, zs) = need (i -1) xs in (x : ys, zs)
 
-extract_InfM :: InfM a -> (a, [Bit])
-extract_InfM (InfM f) = let (x, s) = f undefined in (x, bits s)
+extractInfM :: InfM a -> (a, [Bit])
+extractInfM (InfM f) = let (x, s) = f undefined in (x, bits s)
 
 output_w32 :: Word32 -> InfM ()
 output_w32 w = InfM $ \s ->
@@ -208,15 +203,15 @@ get_word32s b n = do
 
 get_w32 :: Word32 -> InfM Word32
 get_w32 i = do
-  bs <- get_bits i
+  bs <- getBits i
   return (bits_to_word32 bs)
 
-get_bit :: InfM Bit
-get_bit = do
-  res <- get_bits 1
+getBit :: InfM Bit
+getBit = do
+  res <- getBits 1
   case res of
     [x] -> return x
-    _ -> error $ "get_bit: expected exactly one bit"
+    _ -> error "getBit: expected exactly one bit"
 
 {-
 \section{Inflate itself}
@@ -225,18 +220,18 @@ The hardcore stuff!
 
 -}
 inflate :: [Int] -> (Output, [Bit])
-inflate is = extract_InfM $ do
-  set_bits $ concatMap int_to_bits is
-  x <- inflate_blocks False
+inflate is = extractInfM $ do
+  setBits $ concatMap intToBits is
+  x <- inflateBlocks False
   align_8_bits
   return x
 
 -- Bool is true if we have seen the "last" block
-inflate_blocks :: Bool -> InfM Output
-inflate_blocks True = return []
-inflate_blocks False =
+inflateBlocks :: Bool -> InfM Output
+inflateBlocks True = return []
+inflateBlocks False =
   do
-    res <- get_bits 3
+    res <- getBits 3
     case res of
       [Bit is_last, Bit t1, Bit t2] ->
         case (t1, t2) of
@@ -246,43 +241,43 @@ inflate_blocks False =
               len <- get_w32 16
               nlen <- get_w32 16
               unless (len + nlen == 2 ^ (32 :: Int) - 1) $
-                error "inflate_blocks: Mismatched lengths"
+                error "inflateBlocks: Mismatched lengths"
               ws <- get_word32s 8 len
               mapM_ output_w32 ws
               return ws
           (True, False) ->
-            inflate_codes is_last inflate_trees_fixed
+            inflateCodes is_last inflateTreesFixed
           (False, True) ->
             do
-              tables <- inflate_tables
-              inflate_codes is_last tables
+              tables <- inflateTables
+              inflateCodes is_last tables
           (True, True) ->
-            error ("inflate_blocks: case 11 reserved")
-      _ -> error ("inflate_blocks: expected 3 bits")
+            error "inflateBlocks: case 11 reserved"
+      _ -> error "inflateBlocks: expected 3 bits"
 
-inflate_tables :: InfM Tables
-inflate_tables =
+inflateTables :: InfM Tables
+inflateTables =
   do
     hlit <- get_w32 5
     hdist <- get_w32 5
     hclen <- get_w32 4
-    llc_bs <- get_bits ((hclen + 4) * 3)
+    llc_bs <- getBits ((hclen + 4) * 3)
     let llc_bs' =
           zip
             (map bits_to_word32 $ triple llc_bs)
             [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15]
-        tab = make_table llc_bs'
+        tab = makeTable llc_bs'
     lit_dist_lengths <-
-      make_lit_dist_lengths
+      makeLitDistLengths
         tab
         (258 + hlit + hdist)
-        (error "inflate_tables dummy")
+        (error "inflateTables dummy")
     let (lit_lengths, dist_lengths) =
           genericSplitAt
             (257 + hlit)
             lit_dist_lengths
-        lit_table = make_table (zip lit_lengths [0 ..])
-        dist_table = make_table (zip dist_lengths [0 ..])
+        lit_table = makeTable (zip lit_lengths [0 ..])
+        dist_table = makeTable (zip dist_lengths [0 ..])
     return (lit_table, dist_table)
 
 triple :: [a] -> [[a]]
@@ -290,85 +285,77 @@ triple (a : b : c : xs) = [a, b, c] : triple xs
 triple [] = []
 triple _ = error "triple: can't happen"
 
-make_lit_dist_lengths :: Table -> Word32 -> Word32 -> InfM [Word32]
-make_lit_dist_lengths _ i _ | i < 0 = error "make_lit_dist_lengths i < 0"
-make_lit_dist_lengths _ 0 _ = return []
-make_lit_dist_lengths tab i last_thing =
-  do
-    c <- tab
-    (ls, i', last_thing') <- meta_code i c last_thing
-    ws <- make_lit_dist_lengths tab i' last_thing'
-    return (ls ++ ws)
+makeLitDistLengths :: Table -> Word32 -> Word32 -> InfM [Word32]
+makeLitDistLengths _ i _ | i < 0 = error "makeLitDistLengths i < 0"
+makeLitDistLengths _ 0 _ = return []
+makeLitDistLengths tab i last_thing = do
+  c <- tab
+  (ls, i', last_thing') <- metaCode i c last_thing
+  ws <- makeLitDistLengths tab i' last_thing'
+  return (ls ++ ws)
 
-meta_code :: Word32 -> Code -> Word32 -> InfM ([Word32], Word32, Word32)
-meta_code c i _ | i < 16 = return ([i], c - 1, i)
-meta_code c 16 last_thing =
-  do
-    xs <- get_bits 2
-    let l = 3 + bits_to_word32 xs
-    return (genericReplicate l last_thing, c - l, last_thing)
-meta_code c 17 _ = do
-  xs <- get_bits 3
+metaCode :: Word32 -> Code -> Word32 -> InfM ([Word32], Word32, Word32)
+metaCode c i _ | i < 16 = return ([i], c - 1, i)
+metaCode c 16 last_thing = do
+  xs <- getBits 2
+  let l = 3 + bits_to_word32 xs
+  return (genericReplicate l last_thing, c - l, last_thing)
+metaCode c 17 _ = do
+  xs <- getBits 3
   let l = 3 + bits_to_word32 xs
   return (genericReplicate l 0, c - l, 0)
-meta_code c 18 _ = do
-  xs <- get_bits 7
+metaCode c 18 _ = do
+  xs <- getBits 7
   let l = 11 + bits_to_word32 xs
   return (genericReplicate l 0, c - l, 0)
-meta_code _ i _ = error $ "meta_code: " ++ show i
+metaCode _ i _ = error $ "metaCode: " ++ show i
 
-inflate_codes :: Bool -> Tables -> InfM Output
-inflate_codes seen_last tabs@(tab_litlen, tab_dist) =
-  {- do done <- no_bits
-     if done
-       then return [] -- XXX Is this right?
-       else -}
-  do
-    i <- tab_litlen
-    if i == 256
-      then inflate_blocks seen_last
-      else do
-        pref <-
-          if i < 256
-            then do
-              output_w32 i
-              return [i]
-            else case lookup i litlens of
-              Nothing -> error "do_code_litlen"
-              Just (base, num_bits) ->
-                do
-                  extra <- get_w32 num_bits
-                  let l = base + extra
-                  dist <- dist_code tab_dist
-                  repeat_w32s l dist
-        o <- inflate_codes seen_last tabs
-        return (pref ++ o)
+inflateCodes :: Bool -> Tables -> InfM Output
+inflateCodes seen_last tabs@(tab_litlen, tab_dist) = do
+  i <- tab_litlen
+  if i == 256
+    then inflateBlocks seen_last
+    else do
+      pref <-
+        if i < 256
+          then do
+            output_w32 i
+            return [i]
+          else case lookup i litlens of
+            Nothing -> error "do_code_litlen"
+            Just (base, num_bits) ->
+              do
+                extra <- get_w32 num_bits
+                let l = base + extra
+                dist <- distCode tab_dist
+                repeat_w32s l dist
+      o <- inflateCodes seen_last tabs
+      return (pref ++ o)
 
 litlens :: [(Code, (LitLen, Word32))]
-litlens = zip [257 .. 285] $ mk_bases 3 litlen_counts ++ [(258, 0)]
+litlens = zip [257 .. 285] $ mkBases 3 litlen_counts ++ [(258, 0)]
   where
     litlen_counts = [(8, 0), (4, 1), (4, 2), (4, 3), (4, 4), (4, 5)]
 
-dist_code :: Table -> InfM Dist
-dist_code tab =
-  do
-    code <- tab
-    case lookup code dists of
-      Nothing -> error "dist_code"
-      Just (base, num_bits) -> do
-        extra <- get_w32 num_bits
-        return (base + extra)
+distCode :: Table -> InfM Dist
+distCode tab = do
+  code <- tab
+  case lookup code dists of
+    Nothing -> error "distCode"
+    Just (base, num_bits) -> do
+      extra <- get_w32 num_bits
+      return (base + extra)
 
 dists :: [(Code, (Dist, Word32))]
-dists = zip [0 .. 29] $ mk_bases 1 dist_counts
+dists = zip [0 .. 29] $ mkBases 1 dist_counts
   where
-    dist_counts = (4, 0) : map ((,) 2) [1 .. 13]
+    dist_counts = (4, 0) : map (2,) [1 .. 13]
 
-mk_bases :: Word32 -> [(Int, Word32)] -> [(Word32, Word32)]
-mk_bases base counts = snd $ mapAccumL next_base base incs
+mkBases :: Word32 -> [(Int, Word32)] -> [(Word32, Word32)]
+mkBases base counts = snd $ mapAccumL next_base base incs
   where
     next_base current bs = (current + 2 ^ bs, (current, bs))
-    incs = concat $ map (uncurry replicate) counts
+    incs = concatMap (uncurry replicate) counts
 
 {-
 \section{Fixed tables}
@@ -376,14 +363,14 @@ mk_bases base counts = snd $ mapAccumL next_base base incs
 The fixed tables. Not much to say really.
 
 -}
-inflate_trees_fixed :: Tables
-inflate_trees_fixed =
-  ( make_table $
+inflateTreesFixed :: Tables
+inflateTreesFixed =
+  ( makeTable $
       [(8, c) | c <- [0 .. 143]]
         ++ [(9, c) | c <- [144 .. 255]]
         ++ [(7, c) | c <- [256 .. 279]]
         ++ [(8, c) | c <- [280 .. 287]],
-    make_table [(5, c) | c <- [0 .. 29]]
+    makeTable [(5, c) | c <- [0 .. 29]]
   )
 
 {-
@@ -391,32 +378,31 @@ inflate_trees_fixed =
 
 As the name suggests, the obvious way to store Huffman trees is in a
 tree datastructure. Externally we want to view them as functions though,
-so we wrap the tree with \verb!get_code! which takes a list of bits and
+so we wrap the tree with \verb!getCode! which takes a list of bits and
 returns the corresponding code and the remaining bits. To make a tree
 from a list of length code pairs is a simple recursive process.
 
 -}
 data Tree = Branch Tree Tree | Leaf Word32 | Null
 
-make_table :: [(Length, Code)] -> Table
-make_table lcs = case make_tree 0 $ sort $ filter ((/= 0) . fst) lcs of
-  (tree, []) -> get_code tree
-  _ -> error $ "make_table: Left-over lcs from"
+makeTable :: [(Length, Code)] -> Table
+makeTable lcs = case makeTree 0 $ sort $ filter ((/= 0) . fst) lcs of
+  (tree, []) -> getCode tree
+  _ -> error "makeTable: Left-over lcs from"
 
-get_code :: Tree -> InfM Code
-get_code (Branch zero_tree one_tree) =
-  do
-    Bit b <- get_bit
-    if b then get_code one_tree else get_code zero_tree
-get_code (Leaf w) = return w
-get_code Null = error "get_code Null"
+getCode :: Tree -> InfM Code
+getCode (Branch zero_tree one_tree) = do
+  Bit b <- getBit
+  if b then getCode one_tree else getCode zero_tree
+getCode (Leaf w) = return w
+getCode Null = error "getCode Null"
 
-make_tree :: Word32 -> [(Length, Code)] -> (Tree, [(Length, Code)])
-make_tree _ [] = (Null, [])
-make_tree i lcs@((l, c) : lcs')
+makeTree :: Word32 -> [(Length, Code)] -> (Tree, [(Length, Code)])
+makeTree _ [] = (Null, [])
+makeTree i lcs@((l, c) : lcs')
   | i == l = (Leaf c, lcs')
   | i < l =
-    let (zero_tree, lcs_z) = make_tree (i + 1) lcs
-        (one_tree, lcs_o) = make_tree (i + 1) lcs_z
+    let (zero_tree, lcs_z) = makeTree (i + 1) lcs
+        (one_tree, lcs_o) = makeTree (i + 1) lcs_z
      in (Branch zero_tree one_tree, lcs_o)
-  | otherwise = error "make_tree: can't happen"
+  | otherwise = error "makeTree: can't happen"

@@ -68,14 +68,14 @@ instance MD5 BoolList where
     BoolList
       ( bs ++ [True]
           ++ replicate (fromIntegral $ (447 - l) .&. 511) False
-          ++ [l .&. (shiftL 1 x) > 0 | x <- (mangle [0 .. 63])]
+          ++ [l .&. shiftL 1 x > 0 | x <- mangle [0 .. 63]]
       )
     where
       mangle [] = []
       mangle xs = reverse ys ++ mangle zs
         where
           (ys, zs) = splitAt 8 xs
-  finished (BoolList s) = s == []
+  finished (BoolList s) = null s
 
 -- The string instance is fairly straightforward
 
@@ -87,7 +87,7 @@ instance MD5 Str where
     where
       padding = '\128' : replicate (fromIntegral zeros) '\000'
       zeros = shiftR ((440 - c64) .&. 511) 3
-      l = length_to_chars 8 c64
+      l = lengthToChars 8 c64
   finished (Str s) = s == ""
 
 -- YA instance that is believed will be useful
@@ -99,7 +99,7 @@ instance MD5 WordList where
       taken = if l > 511 then 512 else l .&. 511
   len_pad c64 (WordList (ws, l)) = WordList (beginning ++ nextish ++ blanks ++ size, newlen)
     where
-      beginning = if length ws > 0 then start ++ lastone' else []
+      beginning = if not (null ws) then start ++ lastone' else []
       start = init ws
       lastone = last ws
       offset = c64 .&. 31
@@ -108,15 +108,15 @@ instance MD5 WordList where
         shiftL
           (shiftR 128 (fromIntegral $ offset .&. 7))
           (fromIntegral $ offset .&. (31 - 7))
-      nextish = if offset == 0 then [128] else []
+      nextish = [128 | offset == 0]
       c64' = c64 + (32 - offset)
-      num_blanks = (fromIntegral $ shiftR ((448 - c64') .&. 511) 5)
+      num_blanks = fromIntegral $ shiftR ((448 - c64') .&. 511) 5
       blanks = replicate num_blanks 0
       lowsize = fromIntegral $ c64 .&. (shiftL 1 32 - 1)
       topsize = fromIntegral $ shiftR c64 32
       size = [lowsize, topsize]
       newlen =
-        l .&. (complement 511)
+        l .&. complement 511
           + if c64 .&. 511 >= 448 then 1024 else 512
   finished (WordList (_, z)) = z == 0
 
@@ -129,15 +129,15 @@ instance Num ABCD where
 -- | The simplest function, gives you the MD5 of a string as 4-tuple of
 -- 32bit words.
 md5 :: (MD5 a) => a -> ABCD
-md5 m = md5_main False 0 magic_numbers m
+md5 = md5_main False 0 magicNumbers
 
 -- | Returns a hex number ala the md5sum program.
 md5s :: (MD5 a) => a -> String
-md5s = abcd_to_string . md5
+md5s = abcdToString . md5
 
 -- | Returns an integer equivalent to hex number from 'md5s'.
 md5i :: (MD5 a) => a -> Integer
-md5i = abcd_to_integer . md5
+md5i = abcdToInteger . md5
 
 -- ======================== THE CORE ALGORITHM ========================
 
@@ -176,14 +176,6 @@ md5_do_block ::
 md5_do_block abcd0 w = abcd4
   where
     (r1, r2, r3, r4) = rounds
-    {-
-    map (\x -> w !! x) [1,6,11,0,5,10,15,4,9,14,3,8,13,2,7,12]
-                    -- [(5 * x + 1) `mod` 16 | x <- [0..15]]
-    map (\x -> w !! x) [5,8,11,14,1,4,7,10,13,0,3,6,9,12,15,2]
-                    -- [(3 * x + 5) `mod` 16 | x <- [0..15]]
-    map (\x -> w !! x) [0,7,14,5,12,3,10,1,8,15,6,13,4,11,2,9]
-                    -- [(7 * x) `mod` 16 | x <- [0..15]]
-    -}
     perm5 [c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15] =
       [c1, c6, c11, c0, c5, c10, c15, c4, c9, c14, c3, c8, c13, c2, c7, c12]
     perm5 _ = error "broke at perm5"
@@ -245,12 +237,12 @@ md5_h :: XYZ -> Word32
 md5_h (x, y, z) = x `xor` y `xor` z
 
 md5_i :: XYZ -> Word32
-md5_i (x, y, z) = y `xor` (x .|. (complement z))
+md5_i (x, y, z) = y `xor` (x .|. complement z)
 
 -- The magic numbers from the RFC.
 
-magic_numbers :: ABCD
-magic_numbers = ABCD (0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476)
+magicNumbers :: ABCD
+magicNumbers = ABCD (0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476)
 
 -- The 4 lists of (rotation, additive constant) tuples, one for each round
 
@@ -356,8 +348,8 @@ rounds = (r1, r2, r3, r4)
 -- Turn the 4 32 bit words into a string representing the hex number they
 -- represent.
 
-abcd_to_string :: ABCD -> String
-abcd_to_string (ABCD (a, b, c, d)) = concat $ map display_32bits_as_hex [a, b, c, d]
+abcdToString :: ABCD -> String
+abcdToString (ABCD (a, b, c, d)) = concatMap display_32bits_as_hex [a, b, c, d]
 
 -- Split the 32 bit word up, swap the chunks over and convert the numbers
 -- to their hex equivalents.
@@ -365,22 +357,22 @@ abcd_to_string (ABCD (a, b, c, d)) = concat $ map display_32bits_as_hex [a, b, c
 display_32bits_as_hex :: Word32 -> String
 display_32bits_as_hex w = swap_pairs cs
   where
-    cs = map (\x -> getc $ (shiftR w (4 * x)) .&. 15) [0 .. 7]
-    getc n = (['0' .. '9'] ++ ['a' .. 'f']) !! (fromIntegral n)
+    cs = map (\x -> getc $ shiftR w (4 * x) .&. 15) [0 .. 7]
+    getc n = (['0' .. '9'] ++ ['a' .. 'f']) !! fromIntegral n
     swap_pairs (x1 : x2 : xs) = x2 : x1 : swap_pairs xs
     swap_pairs _ = []
 
 -- Convert to an integer, performing endianness magic as we go
 
-abcd_to_integer :: ABCD -> Integer
-abcd_to_integer (ABCD (a, b, c, d)) =
-  rev_num a * 2 ^ (96 :: Int)
-    + rev_num b * 2 ^ (64 :: Int)
-    + rev_num c * 2 ^ (32 :: Int)
-    + rev_num d
+abcdToInteger :: ABCD -> Integer
+abcdToInteger (ABCD (a, b, c, d)) =
+  revNum a * 2 ^ (96 :: Int)
+    + revNum b * 2 ^ (64 :: Int)
+    + revNum c * 2 ^ (32 :: Int)
+    + revNum d
 
-rev_num :: Word32 -> Integer
-rev_num i = toInteger j `mod` (2 ^ (32 :: Int))
+revNum :: Word32 -> Integer
+revNum i = toInteger j `mod` (2 ^ (32 :: Int))
   where
     --         NHC's fault ~~~~~~~~~~~~~~~~~~~~~
     j =
@@ -415,8 +407,8 @@ bools_to_word32s bs = this : bools_to_word32s rest
 -- Convert the size into a list of characters used by the len_pad function
 -- for strings
 
-length_to_chars :: Int -> Zord64 -> String
-length_to_chars 0 _ = []
-length_to_chars p n = this : length_to_chars (p -1) (shiftR n 8)
+lengthToChars :: Int -> Zord64 -> String
+lengthToChars 0 _ = []
+lengthToChars p n = this : lengthToChars (p -1) (shiftR n 8)
   where
     this = chr $ fromIntegral $ n .&. 255
