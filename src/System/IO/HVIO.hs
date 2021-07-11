@@ -1,4 +1,4 @@
-{-# LANGUAGE Safe #-}
+{-# LANGUAGE LambdaCase #-}
 
 {- arch-tag: HVIO main file
 Copyright (c) 2004-2011 John Goerzen <jgoerzen@complete.org>
@@ -128,6 +128,9 @@ import           Foreign.Ptr
 import           Foreign.Storable
 import           System.IO
 import           System.IO.Error
+import  Data.Functor
+import Control.Monad
+import Data.Bifunctor
 
 {- | This is the generic I\/O support class.  All objects that are to be used
 in the HVIO system must provide an instance of 'HVIO'.
@@ -153,38 +156,74 @@ Implementators of seekable objects must provide at least
 class (Show a) => HVIO a where
     -- | Close a file
     vClose :: a -> IO ()
+
     -- | Test if a file is open
     vIsOpen :: a -> IO Bool
+    vIsOpen h = vIsClosed h <&> not
+
     -- | Test if a file is closed
     vIsClosed :: a -> IO Bool
+    vIsClosed h = vIsOpen h <&> not
+
     -- | Raise an error if the file is not open.
     -- This is a new HVIO function and is implemented in terms of
     -- 'vIsOpen'.
     vTestOpen :: a -> IO ()
+    vTestOpen h = do
+      e <- vIsClosed h
+      when e $ vThrow h illegalOperationErrorType
+
     -- | Whether or not we're at EOF.  This may raise on exception
     -- on some items, most notably write-only Handles such as stdout.
     -- In general, this is most reliable on items opened for reading.
     -- vIsEOF implementations must implicitly call vTestOpen.
     vIsEOF :: a -> IO Bool
+
     -- | Detailed show output.
     vShow :: a -> IO String
+    vShow = return . show
+
     -- | Make an IOError.
     vMkIOError :: a -> IOErrorType -> String -> Maybe FilePath -> IOError
+    vMkIOError _ et desc = mkIOError et desc Nothing
+
     -- | Throw an IOError.
     vThrow :: a -> IOErrorType -> IO b
+    vThrow h et = do
+      fp <- vGetFP h
+      ioError (vMkIOError h et "" fp)
+
     -- | Get the filename\/object\/whatever that this corresponds to.
     -- May be Nothing.
     vGetFP :: a -> IO (Maybe FilePath)
+    vGetFP _ = return Nothing
+
     -- | Throw an isEOFError if we're at EOF; returns nothing otherwise.
     -- If an implementation overrides the default, make sure that it
     -- calls vTestOpen at some point.  The default implementation is
     -- a wrapper around a call to 'vIsEOF'.
     vTestEOF :: a -> IO ()
+    vTestEOF h = do
+      e <- vIsEOF h
+      when e $ vThrow h eofErrorType
 
     -- | Read one character
     vGetChar :: a -> IO Char
+    vGetChar h = vThrow h illegalOperationErrorType
+
     -- | Read one line
     vGetLine :: a -> IO String
+    vGetLine h =
+      let loop accum =
+            let func = vGetChar h >>= \case
+                          '\n' -> return accum
+                          x    -> accum `seq` loop (accum ++ [x])
+                handler e = if isEOFError e then return accum else ioError e
+             in catch func handler
+       in vGetChar h >>= \case
+            '\n' -> return []
+            x    -> loop [x]
+
     {- | Get the remaining contents.  Please note that as a user of this
        function, the same partial-closing semantics as are used in the
        standard 'hGetContents' are /encouraged/ from implementators,
@@ -201,51 +240,89 @@ class (Show a) => HVIO a where
        For implementators, you are highly encouraged to provide a correct
        implementation. -}
     vGetContents :: a -> IO String
+    vGetContents h =
+      let loop =
+            let func = do
+                  c <- vGetChar h
+                  next <- loop
+                  c `seq` return (c : next)
+                handler e = if isEOFError e then return [] else ioError e
+             in catch func handler
+       in loop
+
     -- | Indicate whether at least one item is ready for reading.
     -- This will always be True for a great many implementations.
     vReady :: a -> IO Bool
+    vReady h = do
+      vTestEOF h
+      return True
+
     -- | Indicate whether a particular item is available for reading.
     vIsReadable :: a -> IO Bool
+    vIsReadable _ = return False
 
     -- | Write one character
     vPutChar :: a -> Char -> IO ()
+    vPutChar h _ = vThrow h illegalOperationErrorType
+
     -- | Write a string
     vPutStr :: a -> String -> IO ()
+    vPutStr _ [] = return ()
+    vPutStr h (x:xs) = do
+      vPutChar h x
+      vPutStr h xs
+
     -- | Write a string with newline character after it
     vPutStrLn :: a -> String -> IO ()
+    vPutStrLn h s = vPutStr h (s ++ "\n")
+
     -- | Write a string representation of the argument, plus a newline.
     vPrint :: Show b => a -> b -> IO ()
+    vPrint h = vPutStrLn h . show
+
     -- | Flush any output buffers.
     -- Note: implementations should assure that a vFlush is automatically
     -- performed
     -- on file close, if necessary to ensure all data sent is written.
     vFlush :: a -> IO ()
+    vFlush = vTestOpen
+
     -- | Indicate whether or not this particular object supports writing.
     vIsWritable :: a -> IO Bool
+    vIsWritable _ = return False
 
     -- | Seek to a specific location.
     vSeek :: a -> SeekMode -> Integer -> IO ()
+    vSeek h _ _ = vThrow h illegalOperationErrorType
 
     -- | Get the current position.
     vTell :: a -> IO Integer
+    vTell h = vThrow h illegalOperationErrorType
 
     -- | Convenience function to reset the file pointer to the beginning
     -- of the file.  A call to @vRewind h@ is the
     -- same as @'vSeek' h AbsoluteSeek 0@.
     vRewind :: a -> IO ()
+    vRewind h = vSeek h AbsoluteSeek 0
 
     -- | Indicate whether this instance supports seeking.
     vIsSeekable :: a -> IO Bool
+    vIsSeekable _ = return False
 
     -- | Set buffering; the default action is a no-op.
     vSetBuffering :: a -> BufferMode -> IO ()
+    vSetBuffering _ _ = return ()
 
     -- | Get buffering; the default action always returns NoBuffering.
     vGetBuffering :: a -> IO BufferMode
+    vGetBuffering _ = return NoBuffering
 
     -- | Binary output: write the specified number of octets from the specified
     -- buffer location.
     vPutBuf :: a -> Ptr b -> Int -> IO ()
+    vPutBuf h buf len = do
+      str <- peekCStringLen (castPtr buf, len)
+      vPutStr h str
 
     -- | Binary input: read the specified number of octets from the
     -- specified buffer location, continuing to read
@@ -253,103 +330,19 @@ class (Show a) => HVIO a where
     -- Returns the number of octets actually read.  EOF errors are never
     -- raised; fewer bytes than requested are returned on EOF.
     vGetBuf :: a -> Ptr b -> Int -> IO Int
-
-    vSetBuffering _ _ = return ()
-    vGetBuffering _ = return NoBuffering
-
-    vShow x = return (show x)
-
-    vMkIOError _ et desc mfp =
-        mkIOError et desc Nothing mfp
-
-    vGetFP _ = return Nothing
-
-    vThrow h et = do
-                  fp <- vGetFP h
-                  ioError (vMkIOError h et "" fp)
-
-    vTestEOF h = do e <- vIsEOF h
-                    if e then vThrow h eofErrorType
-                       else return ()
-
-    vIsOpen h = vIsClosed h >>= return . not
-    vIsClosed h = vIsOpen h >>= return . not
-    vTestOpen h = do e <- vIsClosed h
-                     if e then vThrow h illegalOperationErrorType
-                        else return ()
-
-
-    vIsReadable _ = return False
-
-    vGetLine h =
-        let loop accum =
-                let func = do c <- vGetChar h
-                              case c of
-                                     '\n' -> return accum
-                                     x    -> accum `seq` loop (accum ++ [x])
-                    handler e = if isEOFError e then return accum
-                                else ioError e
-                    in catch func handler
-            in
-            do firstchar <- vGetChar h
-               case firstchar of
-                   '\n' -> return []
-                   x    -> loop [x]
-
-    vGetContents h =
-        let loop =
-                let func = do c <- vGetChar h
-                              next <- loop
-                              c `seq` return (c : next)
-                    handler e = if isEOFError e then return []
-                                else ioError e
-                    in catch func handler
-            in
-            do loop
-
-    vReady h = do vTestEOF h
-                  return True
-
-
-    vIsWritable _ = return False
-
-    vPutStr _ [] = return ()
-    vPutStr h (x:xs) = do vPutChar h x
-                          vPutStr h xs
-
-    vPutStrLn h s = vPutStr h (s ++ "\n")
-
-    vPrint h s = vPutStrLn h (show s)
-
-    vFlush = vTestOpen
-
-
-    vIsSeekable _ = return False
-
-    vRewind h = vSeek h AbsoluteSeek 0
-
-    vPutChar h _ = vThrow h illegalOperationErrorType
-    vSeek h _ _ = vThrow h illegalOperationErrorType
-    vTell h = vThrow h illegalOperationErrorType
-    vGetChar h = vThrow h illegalOperationErrorType
-
-
-    vPutBuf h buf len =
-        do str <- peekCStringLen (castPtr buf, len)
-           vPutStr h str
-
-    vGetBuf h b l =
-        worker b l 0
-        where worker _ 0 accum = return accum
-              worker buf len accum =
-                  do iseof <- vIsEOF h
-                     if iseof
-                        then return accum
-                        else do c <- vGetChar h
-                                let cc = castCharToCChar c
-                                poke (castPtr buf) cc
-                                let newptr = plusPtr buf 1
-                                worker newptr (len - 1) (accum + 1)
+    vGetBuf h b l = worker b l 0
+      where
+        worker _ 0 accum = return accum
+        worker buf len accum = do
+          iseof <- vIsEOF h
+          if iseof
+            then return accum
+            else do
+              c <- vGetChar h
+              let cc = castCharToCChar c
+              poke (castPtr buf) cc
+              let newptr = plusPtr buf 1
+              worker newptr (len - 1) (accum + 1)
 
 ----------------------------------------------------------------------
 -- Handle instances
@@ -386,17 +379,17 @@ instance HVIO Handle where
 ----------------------------------------------------------------------
 type VIOCloseSupport a = IORef (Bool, a)
 
-vioc_isopen :: VIOCloseSupport a -> IO Bool
-vioc_isopen x = readIORef x >>= return . fst
+viocIsopen :: VIOCloseSupport a -> IO Bool
+viocIsopen x = readIORef x <&> fst
 
-vioc_get :: VIOCloseSupport a -> IO a
-vioc_get x = readIORef x >>= return . snd
+viocGet :: VIOCloseSupport a -> IO a
+viocGet x = readIORef x <&> snd
 
-vioc_close :: VIOCloseSupport a -> IO ()
-vioc_close x = modifyIORef x (\ (_, dat) -> (False, dat))
+viocClose :: VIOCloseSupport a -> IO ()
+viocClose x = modifyIORef x (\ (_, dat) -> (False, dat))
 
-vioc_set :: VIOCloseSupport a -> a -> IO ()
-vioc_set x newdat = modifyIORef x (\ (stat, _) -> (stat, newdat))
+viocSet :: VIOCloseSupport a -> a -> IO ()
+viocSet x newdat = modifyIORef x (\ (stat, _) -> (stat, newdat))
 
 ----------------------------------------------------------------------
 -- Stream Readers
@@ -417,8 +410,9 @@ newtype StreamReader = StreamReader (VIOCloseSupport String)
 {- | Create a new 'StreamReader' object. -}
 newStreamReader :: String            -- ^ Initial contents of the 'StreamReader'
                 -> IO StreamReader
-newStreamReader s = do ref <- newIORef (True, s)
-                       return (StreamReader ref)
+newStreamReader s = do
+  ref <- newIORef (True, s)
+  return (StreamReader ref)
 
 srv :: StreamReader -> VIOCloseSupport String
 srv (StreamReader x) = x
@@ -427,21 +421,21 @@ instance Show StreamReader where
     show _ = "<StreamReader>"
 
 instance HVIO StreamReader where
-    vClose = vioc_close . srv
+    vClose = viocClose . srv
     vIsEOF h = do vTestOpen h
-                  d <- vioc_get (srv h)
+                  d <- viocGet (srv h)
                   return $ case d of
                                   [] -> True
                                   _  -> False
-    vIsOpen = vioc_isopen . srv
+    vIsOpen = viocIsopen . srv
     vGetChar h = do vTestEOF h
-                    c <- vioc_get (srv h)
+                    c <- viocGet (srv h)
                     let retval = head c
-                    vioc_set (srv h) (tail c)
+                    viocSet (srv h) (tail c)
                     return retval
 
     vGetContents h = do vTestEOF h
-                        c <- vioc_get (srv h)
+                        c <- viocGet (srv h)
                         vClose h
                         return c
     vIsReadable _ = return True
@@ -495,57 +489,71 @@ vrv (MemoryBuffer _ x) = x
 Unlike 'vGetContents', this has no effect on the open status of the
 item, the EOF status, or the current position of the file pointer. -}
 getMemoryBuffer :: MemoryBuffer -> IO String
-getMemoryBuffer h = do c <- vioc_get (vrv h)
+getMemoryBuffer h = do c <- viocGet (vrv h)
                        return (snd c)
 
 instance Show MemoryBuffer where
-    show _ = "<MemoryBuffer>"
+  show _ = "<MemoryBuffer>"
 
 instance HVIO MemoryBuffer where
-    vClose x = do wasopen <- vIsOpen x
-                  vioc_close (vrv x)
-                  if wasopen
-                     then do c <- getMemoryBuffer x
-                             case x of
-                                 MemoryBuffer cf _ -> cf c
-                     else return ()
-    vIsEOF h = do vTestOpen h
-                  c <- vioc_get (vrv h)
-                  return ((length (snd c)) == (fst c))
-    vIsOpen = vioc_isopen . vrv
-    vGetChar h = do vTestEOF h
-                    c <- vioc_get (vrv h)
-                    let retval = (snd c) !! (fst c)
-                    vioc_set (vrv h) (succ (fst c), snd c)
-                    return retval
-    vGetContents h = do vTestEOF h
-                        v <- vioc_get (vrv h)
-                        let retval = drop (fst v) (snd v)
-                        vioc_set (vrv h) (-1, "")
-                        vClose h
-                        return retval
-    vIsReadable _ = return True
+  vClose x = do
+    wasopen <- vIsOpen x
+    viocClose (vrv x)
+    when wasopen $ do
+      c <- getMemoryBuffer x
+      case x of
+        MemoryBuffer cf _ -> cf c
 
-    vPutStr h s = do (pos, buf) <- vioc_get (vrv h)
-                     let (pre, post) = splitAt pos buf
-                     let newbuf = pre ++ s ++ (drop (length s) post)
-                     vioc_set (vrv h) (pos + (length s), newbuf)
-    vPutChar h c = vPutStr h [c]
-    vIsWritable _ = return True
-    vTell h = do v <- vioc_get (vrv h)
-                 return . fromIntegral $ (fst v)
-    vSeek h seekmode seekposp =
-        do (pos, buf) <- vioc_get (vrv h)
-           let seekpos = fromInteger seekposp
-           let newpos = case seekmode of
-                             AbsoluteSeek -> seekpos
-                             RelativeSeek -> pos + seekpos
-                             SeekFromEnd  -> (length buf) + seekpos
-           let buf2 = buf ++ if newpos > (length buf)
-                                then replicate (newpos - (length buf)) '\0'
-                                else []
-           vioc_set (vrv h) (newpos, buf2)
-    vIsSeekable _ = return True
+  vIsEOF h = do
+    vTestOpen h
+    c <- viocGet (vrv h)
+    return (length (snd c) == fst c)
+
+  vIsOpen = viocIsopen . vrv
+
+  vGetChar h = do
+    vTestEOF h
+    c <- viocGet (vrv h)
+    let retval = snd c !! fst c
+    viocSet (vrv h) (first succ c)
+    return retval
+
+  vGetContents h = do
+    vTestEOF h
+    v <- viocGet (vrv h)
+    let retval = uncurry drop v
+    viocSet (vrv h) (-1, "")
+    vClose h
+    return retval
+
+  vIsReadable _ = return True
+
+  vPutStr h s = do
+    (pos, buf) <- viocGet (vrv h)
+    let (pre, post) = splitAt pos buf
+    let newbuf = pre ++ s ++ drop (length s) post
+    viocSet (vrv h) (pos + length s, newbuf)
+
+  vPutChar h c = vPutStr h [c]
+  vIsWritable _ = return True
+
+  vTell h = do
+    v <- viocGet (vrv h)
+    return . fromIntegral $ fst v
+
+  vSeek h seekmode seekposp = do
+    (pos, buf) <- viocGet (vrv h)
+    let seekpos = fromInteger seekposp
+    let newpos = case seekmode of
+                      AbsoluteSeek -> seekpos
+                      RelativeSeek -> pos + seekpos
+                      SeekFromEnd  -> length buf + seekpos
+    let buf2 = buf ++ if newpos > length buf
+                        then replicate (newpos - length buf) '\0'
+                        else []
+    viocSet (vrv h) (newpos, buf2)
+
+  vIsSeekable _ = return True
 
 ----------------------------------------------------------------------
 -- Pipes
@@ -563,15 +571,17 @@ and require no special operating system support.  Unlike Unix pipes, these
 pipes cannot be used across a fork().  Also unlike Unix pipes, these pipes
 are portable and interact well with Haskell threads. -}
 newHVIOPipe :: IO (PipeReader, PipeWriter)
-newHVIOPipe = do mv <- newEmptyMVar
-                 readerref <- newIORef (True, mv)
-                 let reader = PipeReader readerref
-                 writerref <- newIORef (True, reader)
-                 return (reader, PipeWriter writerref)
+newHVIOPipe = do
+  mv <- newEmptyMVar
+  readerref <- newIORef (True, mv)
+  let reader = PipeReader readerref
+  writerref <- newIORef (True, reader)
+  return (reader, PipeWriter writerref)
 
-data PipeBit = PipeBit Char
-             | PipeEOF
-               deriving (Eq, Show)
+data PipeBit
+  = PipeBit Char
+  | PipeEOF
+  deriving (Eq, Show)
 
 {- | The reading side of a Haskell pipe.  Please see 'newHVIOPipe' for more
 details. -}
@@ -588,35 +598,41 @@ prv :: PipeReader -> VIOCloseSupport (MVar PipeBit)
 prv (PipeReader x) = x
 
 instance Show PipeReader where
-    show _ = "<PipeReader>"
+  show _ = "<PipeReader>"
 
-pr_getc :: PipeReader -> IO PipeBit
-pr_getc h = do mv <- vioc_get (prv h)
-               takeMVar mv
+dprGetc :: PipeReader -> IO PipeBit
+dprGetc h = do
+  mv <- viocGet (prv h)
+  takeMVar mv
 
 instance HVIO PipeReader where
-    vClose = vioc_close . prv
-    vIsOpen = vioc_isopen . prv
-    vIsEOF h = do vTestOpen h
-                  mv <- vioc_get (prv h)
-                  dat <- readMVar mv
-                  return (dat == PipeEOF)
+  vClose = viocClose . prv
+  vIsOpen = viocIsopen . prv
+  vIsEOF h = do
+    vTestOpen h
+    mv <- viocGet (prv h)
+    dat <- readMVar mv
+    return (dat == PipeEOF)
 
-    vGetChar h = do vTestEOF h
-                    c <- pr_getc h
-                    case c of
-                        PipeBit x -> return x
-                        -- vTestEOF should eliminate this case
-                        _ -> fail "Internal error in HVIOReader vGetChar"
-    vGetContents h =
-        let loop = do c <- pr_getc h
-                      case c of
-                          PipeEOF -> return []
-                          PipeBit x -> do next <- loop
-                                          return (x : next)
-        in do vTestEOF h
-              loop
-    vIsReadable _ = return True
+  vGetChar h = do
+    vTestEOF h
+    dprGetc h >>= \case
+      PipeBit x -> return x
+      -- vTestEOF should eliminate this case
+      _ -> fail "Internal error in HVIOReader vGetChar"
+
+  vGetContents h =
+      let loop = do
+            dprGetc h >>= \case
+              PipeEOF -> return []
+              PipeBit x -> do
+                next <- loop
+                return (x : next)
+      in do
+        vTestEOF h
+        loop
+
+  vIsReadable _ = return True
 
 ------------------------------
 -- Pipe Writer
@@ -625,29 +641,35 @@ pwv :: PipeWriter -> VIOCloseSupport PipeReader
 pwv (PipeWriter x) = x
 
 pwmv :: PipeWriter -> IO (MVar PipeBit)
-pwmv (PipeWriter x) = do mv1 <- vioc_get x
-                         vioc_get (prv mv1)
+pwmv (PipeWriter x) = do mv1 <- viocGet x
+                         viocGet (prv mv1)
 
 instance Show PipeWriter where
     show _ = "<PipeWriter>"
 
 instance HVIO PipeWriter where
-    vClose h = do o <- vIsOpen h
-                  if o then do
-                            mv <- pwmv h
-                            putMVar mv PipeEOF
-                            vioc_close (pwv h)
-                     else return ()
-    vIsOpen = vioc_isopen . pwv
-    vIsEOF h = do vTestOpen h
-                  return False
+    vClose h = do
+      o <- vIsOpen h
+      when o $ do
+        mv <- pwmv h
+        putMVar mv PipeEOF
+        viocClose (pwv h)
+
+    vIsOpen = viocIsopen . pwv
+    
+    vIsEOF h = do
+      vTestOpen h
+      return False
 
     -- FIXME: race condition below (could be closed after testing)
-    vPutChar h c = do vTestOpen h
-                      child <- vioc_get (pwv h)
-                      copen <- vIsOpen child
-                      if copen
-                         then do mv <- pwmv h
-                                 putMVar mv (PipeBit c)
-                         else fail "PipeWriter: Couldn't write to pipe because child end is closed"
+    vPutChar h c = do
+      vTestOpen h
+      child <- viocGet (pwv h)
+      copen <- vIsOpen child
+      if copen
+      then do
+        mv <- pwmv h
+        putMVar mv (PipeBit c)
+      else fail "PipeWriter: Couldn't write to pipe because child end is closed"
+      
     vIsWritable _ = return True

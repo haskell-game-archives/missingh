@@ -29,7 +29,7 @@ module System.IO.HVFS.InstanceHelpers(-- * HVFSStat objects
                                         MemoryNode,
                                         MemoryEntry(..),
                                         -- * Utilities
-                                        nice_slice, getFullPath,
+                                        niceSlice, getFullPath,
                                         getFullSlice)
     where
 
@@ -93,11 +93,11 @@ newMemoryVFSRef r = do
 {- | Similar to 'System.Path.NameManip' but the first element
 won't be @\/@.
 
->nice_slice "/" -> []
->nice_slice "/foo/bar" -> ["foo", "bar"]
+>niceSlice "/" -> []
+>niceSlice "/foo/bar" -> ["foo", "bar"]
 -}
-nice_slice :: String -> [String]
-nice_slice path
+niceSlice :: String -> [String]
+niceSlice path
   | path == [pathSeparator] = []
   | otherwise =
       let sliced1 = slice_path path
@@ -117,12 +117,12 @@ getFullPath fs path = do
                 ("Trouble normalizing path " ++ path) (Just (cwd' </> path))
     Just newpath -> return newpath
 
-{- | Gets the full path via 'getFullPath', then splits it via 'nice_slice'.
+{- | Gets the full path via 'getFullPath', then splits it via 'niceSlice'.
 -}
 getFullSlice :: HVFS a => a -> String -> IO [String]
 getFullSlice fs fp =
     do newpath <- getFullPath fs fp
-       return (nice_slice newpath)
+       return (niceSlice newpath)
 
 -- | Find an element on the tree, assuming a normalized path
 findMelem :: MemoryVFS -> String -> IO MemoryEntry

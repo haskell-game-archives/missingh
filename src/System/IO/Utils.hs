@@ -60,14 +60,14 @@ Example:
 
 -- FIXME: does hGetContents h >>= return . lines not work?
 hGetLines :: HVIO a => a -> IO [String]
-hGetLines h = unsafeInterleaveIO (do
-                                  ieof <- vIsEOF h
-                                  if (ieof)
-                                     then return []
-                                     else do
-                                          line <- vGetLine h
-                                          remainder <- hGetLines h
-                                          return (line : remainder))
+hGetLines h = unsafeInterleaveIO $ do
+  ieof <- vIsEOF h
+  if ieof
+  then return []
+  else do
+    line <- vGetLine h
+    remainder <- hGetLines h
+    return (line : remainder)
 
 
 {- | This is similar to the built-in 'System.IO.interact', but works
@@ -79,8 +79,8 @@ In other words:
 -}
 hInteract :: (HVIO a, HVIO b) => a -> b -> (String -> String) -> IO ()
 hInteract finput foutput func = do
-                                content <- vGetContents finput
-                                vPutStr foutput (func content)
+  content <- vGetContents finput
+  vPutStr foutput (func content)
 
 {- | Line-based interaction.  This is similar to wrapping your
 interact functions with 'lines' and 'unlines'.  This equality holds:
@@ -123,8 +123,8 @@ hGetContents).
 -}
 hCopy :: (HVIO a, HVIO b) => a -> b -> IO ()
 hCopy hin hout = do
-                 c <- vGetContents hin
-                 vPutStr hout c
+  c <- vGetContents hin
+  vPutStr hout c
 
 {- | Copies from one handle to another in raw mode (using hGetContents).
 Takes a function to provide progress updates to the user.
@@ -137,23 +137,21 @@ hCopyProgress :: (HVIO b, HVIO c, Integral a) =>
                  -> Maybe a             -- Estimated file size (passed to func)
                  -> IO Integer                -- Number of bytes copied
 hCopyProgress hin hout func bsize estsize =
-    let copyFunc :: String -> Integer -> IO Integer
-        copyFunc [] count = return count
-        copyFunc indata count =
-            let block = take bsize indata
-                remainder = drop bsize indata
-                newcount = count + (genericLength block)
-                in
-                do
-                vPutStr hout block
-                func estsize count False
-                copyFunc remainder newcount
-        in
-        do
-        c <- vGetContents hin
-        bytes <- copyFunc c 0
-        func estsize bytes True
-        return bytes
+  let copyFunc :: String -> Integer -> IO Integer
+      copyFunc [] count = return count
+      copyFunc indata count =
+        let block = take bsize indata
+            remainder = drop bsize indata
+            newcount = count + genericLength block
+          in do
+            vPutStr hout block
+            func estsize count False
+            copyFunc remainder newcount
+  in do
+    c <- vGetContents hin
+    bytes <- copyFunc c 0
+    func estsize bytes True
+    return bytes
 
 {- | Copies from one handle to another in text mode (with lines).
 Like 'hBlockCopy', this implementation is nice:

@@ -82,22 +82,24 @@ instance HVFSOpenable a => HVFSOpenable (HVFSReadOnly a) where
 {- | Access a subdirectory of a real filesystem as if it was the root
 of that filesystem. -}
 data HVFS a => HVFSChroot a = HVFSChroot String a
-                            deriving (Eq, Show)
+  deriving (Eq, Show)
 
 {- | Create a new 'HVFSChroot' object. -}
 newHVFSChroot :: HVFS a => a            -- ^ The object to pass requests on to
               -> FilePath               -- ^ The path of the directory to make root
               -> IO (HVFSChroot a)      -- ^ The resulting new object
-newHVFSChroot fh fp =
-    do full <- getFullPath fh fp
-       isdir <- vDoesDirectoryExist fh full
-       if isdir
-          then do let newobj = (HVFSChroot full fh)
-                  vSetCurrentDirectory newobj [pathSeparator]
-                  return newobj
-          else vRaiseError fh doesNotExistErrorType
-                 ("Attempt to instantiate HVFSChroot over non-directory " ++ full)
-                 (Just full)
+newHVFSChroot fh fp = do
+  full <- getFullPath fh fp
+  isdir <- vDoesDirectoryExist fh full
+  if isdir
+    then do
+      let newobj = HVFSChroot full fh
+      vSetCurrentDirectory newobj [pathSeparator]
+      return newobj
+    else
+      vRaiseError fh doesNotExistErrorType
+        ("Attempt to instantiate HVFSChroot over non-directory " ++ full)
+        (Just full)
 
 {- | Get the embedded object -}
 dch :: (HVFS t) => HVFSChroot t -> t
@@ -105,64 +107,72 @@ dch (HVFSChroot _ a) = a
 
 {- | Convert a local (chroot) path to a full path. -}
 dch2fp, fp2dch :: (HVFS t) => HVFSChroot t -> String -> IO String
-dch2fp mainh@(HVFSChroot fp h) locfp =
-    do full <- (fp ++) `fmap` if isPathSeparator (head locfp)
-                                then return locfp
-                                else getFullPath mainh locfp
-       case secureAbsNormPath fp full of
-           Nothing -> vRaiseError h doesNotExistErrorType
-                        ("Trouble normalizing path in chroot")
-                        (Just (fp ++ "," ++ full))
-           Just x -> return x
+dch2fp mainh@(HVFSChroot fp h) locfp = do
+  full <- (fp ++) `fmap` if isPathSeparator (head locfp)
+                          then return locfp
+                          else getFullPath mainh locfp
+  case secureAbsNormPath fp full of
+    Nothing -> vRaiseError h doesNotExistErrorType
+                "Trouble normalizing path in chroot"
+                (Just (fp ++ "," ++ full))
+    Just x -> return x
 
 {- | Convert a full path to a local (chroot) path. -}
-fp2dch (HVFSChroot fp h) locfp =
-    do newpath <- case secureAbsNormPath fp locfp of
-                     Nothing -> vRaiseError h doesNotExistErrorType
-                                  ("Unable to securely normalize path")
-                                  (Just (fp </> locfp))
-                     Just x -> return x
-       if (take (length fp) newpath /= fp)
-               then vRaiseError h doesNotExistErrorType
-                        ("Local path is not subdirectory of parent path")
-                        (Just newpath)
-               else let newpath2 = drop (length fp) newpath
-                        in return $ normalise_path ([pathSeparator] ++ newpath2)
+fp2dch (HVFSChroot fp h) locfp = do
+  newpath <-
+    case secureAbsNormPath fp locfp of
+      Nothing -> vRaiseError h doesNotExistErrorType
+                  "Unable to securely normalize path"
+                  (Just (fp </> locfp))
+      Just x -> return x
+  if take (length fp) newpath /= fp
+    then vRaiseError h doesNotExistErrorType
+            "Local path is not subdirectory of parent path"
+            (Just newpath)
+    else let newpath2 = drop (length fp) newpath
+          in return $ normalise_path ([pathSeparator] ++ newpath2)
 
 dch2fph :: (HVFS t) => (t -> String -> IO t1) -> HVFSChroot t -> [Char] -> IO t1
-dch2fph func fh@(HVFSChroot _ h) locfp =
-    do newfp <- dch2fp fh locfp
-       func h newfp
+dch2fph func fh@(HVFSChroot _ h) locfp = do
+  newfp <- dch2fp fh locfp
+  func h newfp
 
 instance HVFS a => HVFS (HVFSChroot a) where
-    vGetCurrentDirectory x = do fp <- vGetCurrentDirectory (dch x)
-                                fp2dch x fp
+    vGetCurrentDirectory x = do
+      fp <- vGetCurrentDirectory (dch x)
+      fp2dch x fp
     vSetCurrentDirectory = dch2fph vSetCurrentDirectory
     vGetDirectoryContents = dch2fph vGetDirectoryContents
     vDoesFileExist = dch2fph vDoesFileExist
     vDoesDirectoryExist = dch2fph vDoesDirectoryExist
     vCreateDirectory = dch2fph vCreateDirectory
     vRemoveDirectory = dch2fph vRemoveDirectory
-    vRenameDirectory fh old new = do old' <- dch2fp fh old
-                                     new' <- dch2fp fh new
-                                     vRenameDirectory (dch fh) old' new'
+    vRenameDirectory fh old new = do
+      old' <- dch2fp fh old
+      new' <- dch2fp fh new
+      vRenameDirectory (dch fh) old' new'
     vRemoveFile = dch2fph vRemoveFile
-    vRenameFile fh old new = do old' <- dch2fp fh old
-                                new' <- dch2fp fh new
-                                vRenameFile (dch fh) old' new'
+    vRenameFile fh old new = do
+      old' <- dch2fp fh old
+      new' <- dch2fp fh new
+      vRenameFile (dch fh) old' new'
     vGetFileStatus = dch2fph vGetFileStatus
     vGetSymbolicLinkStatus = dch2fph vGetSymbolicLinkStatus
     vGetModificationTime = dch2fph vGetModificationTime
     -- vRaiseError
-    vCreateSymbolicLink fh old new = do old' <- dch2fp fh old
-                                        new' <- dch2fp fh new
-                                        vCreateSymbolicLink (dch fh) old' new'
-    vReadSymbolicLink fh fp = do result <- dch2fph vReadSymbolicLink fh fp
-                                 fp2dch fh result
-    vCreateLink fh old new = do old' <- dch2fp fh old
-                                new' <- dch2fp fh new
-                                vCreateLink (dch fh) old' new'
+    vCreateSymbolicLink fh old new = do
+      old' <- dch2fp fh old
+      new' <- dch2fp fh new
+      vCreateSymbolicLink (dch fh) old' new'
+    vReadSymbolicLink fh fp = do
+      result <- dch2fph vReadSymbolicLink fh fp
+      fp2dch fh result
+    vCreateLink fh old new = do
+      old' <- dch2fp fh old
+      new' <- dch2fp fh new
+      vCreateLink (dch fh) old' new'
 
 instance HVFSOpenable a => HVFSOpenable (HVFSChroot a) where
-    vOpen fh fp mode = do newfile <- dch2fp fh fp
-                          vOpen (dch fh) newfile mode
+    vOpen fh fp mode = do
+      newfile <- dch2fp fh fp
+      vOpen (dch fh) newfile mode
