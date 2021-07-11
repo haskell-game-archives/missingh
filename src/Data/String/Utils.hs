@@ -75,7 +75,7 @@ lstrip :: String -> String
 lstrip s = case s of
   [] -> []
   (x : xs) ->
-    if elem x wschars
+    if x `elem` wschars
       then lstrip xs
       else s
 
@@ -86,7 +86,7 @@ rstrip = reverse . lstrip . reverse
 -- | Splits a string around whitespace.  Empty elements in the result
 -- list are automatically removed.
 splitWs :: String -> [String]
-splitWs = filter (\x -> x /= []) . splitRegex (mkRegex "[ \t\n\r\v\f]+")
+splitWs = filter (/= []) . splitRegex (mkRegex "[ \t\n\r\v\f]+")
 
 -- | Escape all characters in the input pattern that are not alphanumeric.
 --

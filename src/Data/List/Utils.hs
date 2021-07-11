@@ -93,7 +93,7 @@ import Data.List
 --    merge (sort xs) (sort ys) == sort (xs ++ ys)
 --          where types = xs :: [Int]
 merge :: (Ord a) => [a] -> [a] -> [a]
-merge = mergeBy (compare)
+merge = mergeBy compare
 
 -- | Merge two sorted lists using into a single, sorted whole,
 -- allowing the programmer to specify the comparison function.
@@ -107,7 +107,7 @@ merge = mergeBy (compare)
 mergeBy :: (a -> a -> Ordering) -> [a] -> [a] -> [a]
 mergeBy _ [] ys = ys
 mergeBy _ xs [] = xs
-mergeBy cmp (allx@(x : xs)) (ally@(y : ys))
+mergeBy cmp allx@(x : xs) ally@(y : ys)
   -- Ordering derives Eq, Ord, so the comparison below is valid.
   -- Explanation left as an exercise for the reader.
   -- Someone please put this code out of its misery.
@@ -144,7 +144,7 @@ hasAny ::
   Bool
 hasAny [] _ = False -- An empty search list: always false
 hasAny _ [] = False -- An empty list to scan: always false
-hasAny search (x : xs) = if x `elem` search then True else hasAny search xs
+hasAny search (x : xs) = x `elem` search || hasAny search xs
 
 -- | Similar to Data.List.takeWhile, takes elements while the func is true.
 -- The function is given the remainder of the list to examine.
@@ -197,7 +197,7 @@ split delim str =
         [] -> []
         x ->
           if x == delim
-            then [] : []
+            then [[]]
             else
               split
                 delim
@@ -214,7 +214,7 @@ split delim str =
 --
 -- >replace old new l = join new . split old $ l
 replace :: Eq a => [a] -> [a] -> [a] -> [a]
-replace old new l = join new . split old $ l
+replace old new = join new . split old
 
 -- | Given a delimiter and a list of items (or strings), join the items
 -- by using the delimiter.
@@ -223,7 +223,7 @@ replace old new l = join new . split old $ l
 --
 -- > join "|" ["foo", "bar", "baz"] -> "foo|bar|baz"
 join :: [a] -> [[a]] -> [a]
-join delim l = concat (intersperse delim l)
+join = intercalate
 
 -- | Like 'join', but works with a list of anything showable, converting
 -- it to a String.
@@ -261,7 +261,7 @@ addToAL l key value = (key, value) : delFromAL l key
 -- | Removes all (key, value) pairs from the given list where the key
 -- matches the given one.
 delFromAL :: Eq key => [(key, a)] -> key -> [(key, a)]
-delFromAL l key = filter (\a -> (fst a) /= key) l
+delFromAL l key = filter (\a -> fst a /= key) l
 
 -- | Returns the keys that comprise the (key, value) pairs of the given AL.
 --
@@ -282,8 +282,7 @@ valuesAL = map snd
 
 -- | Indicates whether or not the given key is in the AL.
 hasKeyAL :: Eq a => a -> [(a, b)] -> Bool
-hasKeyAL key list =
-  elem key (keysAL list)
+hasKeyAL key list = key `elem` keysAL list
 
 -- | Flips an association list.  Converts (key1, val), (key2, val) pairs
 -- to (val, [key1, key2]).
@@ -409,16 +408,14 @@ wholeMap (WholeFunc func) inplist =
 -- >wholeMap (fixedWidth [5, 3, 6, 1]) "Hello, This is a test."
 -- > --> ["Hello",", T","his is"," ","a test."]
 fixedWidth :: [Int] -> WholeFunc a [a]
-fixedWidth len =
-  WholeFunc (fixedWidthFunc len)
+fixedWidth = WholeFunc . fixedWidthFunc
   where
     -- Empty input: Empty output, stop
-    fixedWidthFunc _ [] = ((fixedWidth []), [], [])
+    fixedWidthFunc _ [] = (fixedWidth [], [], [])
     -- Empty length: Stop here.
-    fixedWidthFunc [] x = ((fixedWidth []), [], [x])
+    fixedWidthFunc [] x = (fixedWidth [], [], [x])
     -- Stuff to process: Do it.
-    fixedWidthFunc (len' : lenxs) input =
-      (fixedWidth lenxs, next, [this])
+    fixedWidthFunc (len' : lenxs) input = (fixedWidth lenxs, next, [this])
       where
         (this, next) = splitAt len' input
 

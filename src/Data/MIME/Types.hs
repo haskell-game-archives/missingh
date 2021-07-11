@@ -1,4 +1,3 @@
-{-# LANGUAGE Safe #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 {- arch-tag: MIME Types main file
@@ -36,10 +35,11 @@ module Data.MIME.Types
   )
 where
 
-import qualified Control.Exception (IOException, try)
+import qualified Control.Exception
 import Control.Monad
 import Data.Char
-import qualified Data.Map as Map
+import Data.Map (Map)
+import qualified Data.Map as Map hiding (Map)
 import Data.Map.Utils
 import System.IO
 import System.IO.Utils
@@ -53,15 +53,15 @@ data MIMETypeData = MIMETypeData
   { -- | A mapping used to expand common suffixes into equivolent,
     -- better-parsed versions.  For instance, ".tgz" would expand
     -- into ".tar.gz".
-    suffixMap :: Map.Map String String,
+    suffixMap :: Map String String,
     -- | A mapping used to determine the encoding of a file.
     -- This is used, for instance, to map ".gz" to "gzip".
-    encodingsMap :: Map.Map String String,
+    encodingsMap :: Map String String,
     -- | A mapping used to map extensions to MIME types.
-    typesMap :: Map.Map String String,
+    typesMap :: Map String String,
     -- | A mapping used to augment the 'typesMap' when non-strict
     -- lookups are used.
-    commonTypesMap :: Map.Map String String
+    commonTypesMap :: Map String String
   }
 
 -- | Return value from guessing a file's type.
@@ -109,7 +109,7 @@ hReadMIMETypes mtd strict h =
             procwords (('#' : _) : _) = []
             procwords (x : xs) = x : procwords xs
             l2 = procwords l1
-         in if (length l2) >= 2
+         in if length l2 >= 2
               then
                 let thetype = head l2
                     suffixlist = tail l2
@@ -201,17 +201,16 @@ addType ::
   String ->
   -- | Result of addition
   MIMETypeData
-addType mtd strict thetype theext =
-  setStrict mtd strict (\m -> Map.insert theext thetype m)
+addType mtd strict thetype theext = setStrict mtd strict (Map.insert theext thetype)
 
 -- | Default MIME type data to use
 defaultmtd :: MIMETypeData
 defaultmtd =
   MIMETypeData
-    { suffixMap = default_suffix_map,
-      encodingsMap = default_encodings_map,
-      typesMap = default_types_map,
-      commonTypesMap = default_common_types
+    { suffixMap = defaultSuffixMap,
+      encodingsMap = defaultEncodingsMap,
+      typesMap = defaultTypesMap,
+      commonTypesMap = defaultCommonTypes
     }
 
 -- | Read the system's default mime.types files, and add the data contained
@@ -234,11 +233,11 @@ readSystemMIMETypes mtd =
 ----------------------------------------------------------------------
 -- Internal utilities
 ----------------------------------------------------------------------
-getStrict :: MIMETypeData -> Bool -> Map.Map String String
+getStrict :: MIMETypeData -> Bool -> Map String String
 getStrict mtd True = typesMap mtd
 getStrict mtd False = Map.union (typesMap mtd) (commonTypesMap mtd)
 
-setStrict :: MIMETypeData -> Bool -> (Map.Map String String -> Map.Map String String) -> MIMETypeData
+setStrict :: MIMETypeData -> Bool -> (Map String String -> Map String String) -> MIMETypeData
 setStrict mtd True func = mtd {typesMap = func (typesMap mtd)}
 setStrict mtd False func = mtd {commonTypesMap = func (commonTypesMap mtd)}
 
@@ -254,20 +253,20 @@ defaultfilelocations =
     "/usr/local/etc/mime.types" -- Apache 1.3
   ]
 
-default_encodings_map, default_suffix_map, default_types_map, default_common_types :: Map.Map String String
-default_encodings_map =
+defaultEncodingsMap, defaultSuffixMap, defaultTypesMap, defaultCommonTypes :: Map String String
+defaultEncodingsMap =
   Map.fromList
     [ (".Z", "compress"),
       (".gz", "gzip"),
       (".bz2", "bzip2")
     ]
-default_suffix_map =
+defaultSuffixMap =
   Map.fromList
     [ (".tgz", ".tar.gz"),
       (".tz", ".tar.gz"),
       (".taz", ".tar.gz")
     ]
-default_types_map =
+defaultTypesMap =
   Map.fromList
     [ (".a", "application/octet-stream"),
       (".ai", "application/postscript"),
@@ -387,7 +386,7 @@ default_types_map =
       (".xwd", "image/x-xwindowdump"),
       (".zip", "application/zip")
     ]
-default_common_types =
+defaultCommonTypes =
   Map.fromList
     [ (".jpg", "image/jpg"),
       (".mid", "audio/midi"),

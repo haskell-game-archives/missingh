@@ -64,6 +64,7 @@ import Control.Concurrent.MVar
 import Data.Ratio
 import System.Time
 import System.Time.Utils
+import Data.Functor
 
 -- $introduction
 --
@@ -152,15 +153,8 @@ class ProgressStatuses a b where
   --       to the function.
   withStatus :: a -> (ProgressStatus -> b) -> b
 
-{-
-instance ProgressStatuses ProgressRecord b where
-    withStatus x func = func (status x)
-instance ProgressRecords ProgressRecord b where
-    withRecord x func = func x
--}
-
 instance ProgressStatuses Progress (IO b) where
-  withStatus (Progress x) func = withMVar x (\y -> func (status y))
+  withStatus (Progress x) func = withMVar x (func . status)
 
 instance ProgressStatuses ProgressStatus b where
   withStatus x func = func x
@@ -186,19 +180,18 @@ newProgress ::
   -- | Total units expected
   Integer ->
   IO Progress
-newProgress name total =
-  do
-    t <- defaultTimeSource
-    newProgress'
-      ( ProgressStatus
-          { completedUnits = 0,
-            totalUnits = total,
-            startTime = t,
-            trackerName = name,
-            timeSource = defaultTimeSource
-          }
-      )
-      []
+newProgress name total = do
+  t <- defaultTimeSource
+  newProgress'
+    ( ProgressStatus
+        { completedUnits = 0,
+          totalUnits = total,
+          startTime = t,
+          trackerName = name,
+          timeSource = defaultTimeSource
+        }
+    )
+    []
 
 -- | Create a new 'Progress' object initialized with the given status and
 -- callbacks.
@@ -210,16 +203,15 @@ newProgress' ::
   ProgressStatus ->
   [ProgressCallback] ->
   IO Progress
-newProgress' news newcb =
-  do
-    r <-
-      newMVar $
-        ProgressRecord
-          { parents = [],
-            callbacks = newcb,
-            status = news
-          }
-    return (Progress r)
+newProgress' news newcb = do
+  r <-
+    newMVar $
+      ProgressRecord
+        { parents = [],
+          callbacks = newcb,
+          status = news
+        }
+  return (Progress r)
 
 -- | Adds an new callback to an existing 'Progress'.  The callback will be
 -- called whenever the object's status is updated, except by the call to finishP.
@@ -239,11 +231,10 @@ addParent ::
   -- | The parent to add to this child
   Progress ->
   IO ()
-addParent (Progress mcpo) ppo = modifyMVar_ mcpo $ \cpo ->
-  do
-    incrP' ppo (completedUnits . status $ cpo)
-    incrTotal ppo (totalUnits . status $ cpo)
-    return $ cpo {parents = ppo : parents cpo}
+addParent (Progress mcpo) ppo = modifyMVar_ mcpo $ \cpo -> do
+  incrP' ppo (completedUnits . status $ cpo)
+  incrTotal ppo (totalUnits . status $ cpo)
+  return $ cpo {parents = ppo : parents cpo}
 
 -- | Call this when you are finished with the object.  It is especially
 -- important to do this when parent objects are involved.
@@ -258,23 +249,21 @@ addParent (Progress mcpo) ppo = modifyMVar_ mcpo $ \cpo ->
 -- values on the parent would be off since it would be expecting more data than
 -- actually arrived.
 finishP :: Progress -> IO ()
-finishP (Progress mp) =
-  modifyMVar_ mp modfunc
+finishP (Progress mp) = modifyMVar_ mp modfunc
   where
     modfunc :: ProgressRecord -> IO ProgressRecord
-    modfunc oldpr =
-      do
-        let adjustment =
-              (completedUnits . status $ oldpr)
-                - (totalUnits . status $ oldpr)
-        callParents oldpr (\x -> incrTotal x adjustment)
-        return $
-          oldpr
-            { status =
-                (status oldpr)
-                  { totalUnits = completedUnits . status $ oldpr
-                  }
-            }
+    modfunc oldpr = do
+      let adjustment =
+            (completedUnits . status $ oldpr)
+              - (totalUnits . status $ oldpr)
+      callParents oldpr (`incrTotal` adjustment)
+      return $
+        oldpr
+          { status =
+              (status oldpr)
+                { totalUnits = completedUnits . status $ oldpr
+                }
+          }
 
 ----------------------------------------------------------------------
 -- Updating
@@ -362,14 +351,13 @@ setTotal po count =
 -- a number that is valid as any Fractional type, such as a Double, Float, or
 -- Rational.
 getSpeed :: (ProgressStatuses a (IO b), Fractional b) => a -> IO b
-getSpeed po = withStatus po $ \status' ->
-  do
-    t <- timeSource status'
-    let elapsed = t - (startTime status')
-    return $
-      if elapsed == 0
-        then fromRational 0
-        else fromRational ((completedUnits status') % elapsed)
+getSpeed po = withStatus po $ \status' -> do
+  t <- timeSource status'
+  let elapsed = t - startTime status'
+  return $
+    if elapsed == 0
+      then fromRational 0
+      else fromRational (completedUnits status' % elapsed)
 
 -- | Returns the estimated time remaining, in standard time units.
 --
@@ -383,17 +371,16 @@ getETR ::
   ) =>
   a ->
   IO Integer
-getETR po =
-  do
-    speed <- ((getSpeed po) :: IO Rational)
-    if speed == 0
-      then return 0
-      else -- FIXME: potential for a race condition here, but it should
-      -- be negligible
-      withStatus po $ \status' ->
-        do
-          let remaining = totalUnits status' - completedUnits status'
-          return $ round $ (toRational remaining) / speed
+getETR po = do
+  speed <- (getSpeed po :: IO Rational)
+  if speed == 0
+    then return 0
+    else -- FIXME: potential for a race condition here, but it should
+    -- be negligible
+    withStatus po $ \status' ->
+      do
+        let remaining = totalUnits status' - completedUnits status'
+        return $ round $ toRational remaining / speed
 
 -- | Returns the estimated system clock time of completion, in standard
 -- time units.  Returns the current time whenever 'getETR' would return 0.
@@ -406,14 +393,13 @@ getETA ::
   ) =>
   a ->
   IO Integer
-getETA po =
-  do
-    etr <- getETR po
-    -- FIXME: similar race potential here
-    withStatus po $ \status' ->
-      do
-        timenow <- timeSource status'
-        return $ timenow + etr
+getETA po = do
+  etr <- getETR po
+  -- FIXME: similar race potential here
+  withStatus po $ \status' ->
+    do
+      timenow <- timeSource status'
+      return $ timenow + etr
 
 ----------------------------------------------------------------------
 -- Utilities
@@ -423,7 +409,7 @@ getETA po =
 --
 -- >getClockTime >>= (return . clockTimeToEpoch)
 defaultTimeSource :: ProgressTimeSource
-defaultTimeSource = getClockTime >>= (return . clockTimeToEpoch)
+defaultTimeSource = getClockTime <&> clockTimeToEpoch
 
 modStatus :: Progress -> (ProgressStatus -> ProgressStatus) -> IO ()
 -- FIXME/TODO: handle parents
@@ -431,23 +417,22 @@ modStatus (Progress mp) func =
   modifyMVar_ mp modfunc
   where
     modfunc :: ProgressRecord -> IO ProgressRecord
-    modfunc oldpr =
-      do
-        let newpr = oldpr {status = func (status oldpr)}
-        mapM_
-          (\x -> x (status oldpr) (status newpr))
-          (callbacks oldpr)
+    modfunc oldpr = do
+      let newpr = oldpr {status = func (status oldpr)}
+      mapM_
+        (\x -> x (status oldpr) (status newpr))
+        (callbacks oldpr)
 
-        -- Kick it up to the parents.
-        case (completedUnits . status $ newpr)
-          - (completedUnits . status $ oldpr) of
-          0 -> return ()
-          x -> callParents newpr (\y -> incrP' y x)
-        case (totalUnits . status $ newpr)
-          - (totalUnits . status $ oldpr) of
-          0 -> return ()
-          x -> callParents newpr (\y -> incrTotal y x)
-        return newpr
+      -- Kick it up to the parents.
+      case (completedUnits . status $ newpr)
+        - (completedUnits . status $ oldpr) of
+        0 -> return ()
+        x -> callParents newpr (`incrP'` x)
+      case (totalUnits . status $ newpr)
+        - (totalUnits . status $ oldpr) of
+        0 -> return ()
+        x -> callParents newpr (`incrTotal` x)
+      return newpr
 
 callParents :: ProgressRecord -> (Progress -> IO ()) -> IO ()
 callParents pr func = mapM_ func (parents pr)

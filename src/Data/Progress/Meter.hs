@@ -212,11 +212,10 @@ killAutoDisplayMeter pm t =
 
 -- | Render the current status.
 renderMeter :: ProgressMeter -> IO String
-renderMeter r = withMVar r $ renderMeterR
+renderMeter r = withMVar r renderMeterR
 
 renderMeterR :: ProgressMeterR -> IO String
-renderMeterR meter =
-  do
+renderMeterR meter = do
     overallpct <- renderpct $ masterP meter
     compnnts <-
       mapM
@@ -227,40 +226,38 @@ renderMeterR meter =
           x -> x ++ " "
     rightpart <- renderoverall (renderer meter) (masterP meter)
     let leftpart = overallpct ++ " " ++ componentstr
-    let padwidth = (width meter) - 1 - (length leftpart) - (length rightpart)
+    let padwidth = width meter - 1 - length leftpart - length rightpart
     if padwidth < 1
       then return $ take (width meter - 1) $ leftpart ++ rightpart
       else return $ leftpart ++ replicate padwidth ' ' ++ rightpart
   where
     u = unit meter
-    renderpct pt =
-      withStatus pt renderpctpts
+    renderpct pt = withStatus pt renderpctpts
     renderpctpts pts =
-      if (totalUnits pts == 0)
+      if totalUnits pts == 0
         then return "0%"
-        else return $ show (((completedUnits pts) * 100) `div` (totalUnits pts)) ++ "%"
+        else return $ show ((completedUnits pts * 100) `div` totalUnits pts) ++ "%"
+
     rendercomponent :: ([Integer] -> [String]) -> Progress -> IO String
-    rendercomponent rfunc pt = withStatus pt $ \pts ->
-      do
-        pct <- renderpctpts pts
-        let renders = rfunc [totalUnits pts, completedUnits pts]
-        return $
-          "[" ++ trackerName pts ++ " "
-            ++ (renders !! 1)
-            ++ u
-            ++ "/"
-            ++ head renders
-            ++ u
-            ++ " "
-            ++ pct
-            ++ "]"
+    rendercomponent rfunc pt = withStatus pt $ \pts -> do
+      pct <- renderpctpts pts
+      let renders = rfunc [totalUnits pts, completedUnits pts]
+      return $
+        "[" ++ trackerName pts ++ " "
+          ++ (renders !! 1)
+          ++ u
+          ++ "/"
+          ++ head renders
+          ++ u
+          ++ " "
+          ++ pct
+          ++ "]"
 
     renderoverall :: (ProgressStatuses a (IO [Char])) => ([Integer] -> [[Char]]) -> a -> IO [Char]
-    renderoverall rfunc pt = withStatus pt $ \pts ->
-      do
-        etr <- getETR pts
-        speed <- getSpeed pts
-        return $
-          head (rfunc [floor (speed :: Double)]) ++ u
-            ++ "/s "
-            ++ renderSecs etr
+    renderoverall rfunc pt = withStatus pt $ \pts -> do
+      etr <- getETR pts
+      speed <- getSpeed pts
+      return $
+        head (rfunc [floor (speed :: Double)]) ++ u
+          ++ "/s "
+          ++ renderSecs etr

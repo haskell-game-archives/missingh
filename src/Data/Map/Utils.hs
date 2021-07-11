@@ -31,19 +31,21 @@ module Data.Map.Utils
   )
 where
 
-import Data.List.Utils (flipAL, strFromAL, strToAL)
-import qualified Data.Map
+import Data.List.Utils
+import Data.Map (Map)
+import qualified Data.Map as Map
+import Data.Maybe
 
 -- | Converts a String, String Map into a string representation.
 -- See 'Data.List.Utils.strFromAL' for more on the similar function for
 -- association lists.  This implementation is simple:
 --
--- >strFromM = strFromAL . Data.Map.toList
+-- >strFromM = strFromAL . Map.toList
 --
 -- This function is designed to work with Map String String objects,
 -- but may also work with other objects with simple representations.
-strFromM :: (Show a, Show b, Ord a) => Data.Map.Map a b -> String
-strFromM = strFromAL . Data.Map.toList
+strFromM :: (Show a, Show b, Ord a) => Map a b -> String
+strFromM = strFromAL . Map.toList
 
 -- | Converts a String into a String, String Map.  See
 -- 'Data.List.Utils.strToAL' for more on the similar function for association
@@ -51,27 +53,24 @@ strFromM = strFromAL . Data.Map.toList
 --
 -- This implementation is simple:
 --
--- >strToM = Data.Map.fromList . strToAL
+-- >strToM = Map.fromList . strToAL
 --
 -- This function is designed to work with Map String String objects,
 -- but may work with other key\/value combinations if they have simple
 -- representations.
-strToM :: (Read a, Read b, Ord a) => String -> Data.Map.Map a b
-strToM = Data.Map.fromList . strToAL
+strToM :: (Read a, Read b, Ord a) => String -> Map a b
+strToM = Map.fromList . strToAL
 
 -- | Flips a Map.  See 'Data.List.Utils.flipAL' for more on the similar
 -- function for lists.
-flipM :: (Ord key, Ord val) => Data.Map.Map key val -> Data.Map.Map val [key]
-flipM = Data.Map.fromList . flipAL . Data.Map.toList
+flipM :: (Ord key, Ord val) => Map key val -> Map val [key]
+flipM = Map.fromList . flipAL . Map.toList
 
 -- | Returns a list of all keys in the Map whose value matches the
 -- parameter. If the value does not occur in the Map, the empty
 -- list is returned.
-flippedLookupM :: (Ord val, Ord key) => val -> Data.Map.Map key val -> [key]
-flippedLookupM v fm =
-  case Data.Map.lookup v (flipM fm) of
-    Nothing -> []
-    Just x -> x
+flippedLookupM :: (Ord val, Ord key) => val -> Map key val -> [key]
+flippedLookupM v fm = fromMaybe [] (Map.lookup v (flipM fm))
 
 -- | Performs a lookup, and raises an exception (with an error message
 -- prepended with the given string) if the key could not be found.
@@ -79,9 +78,9 @@ forceLookupM ::
   (Show key, Ord key) =>
   String ->
   key ->
-  Data.Map.Map key elt ->
+  Map key elt ->
   elt
 forceLookupM msg k fm =
-  case Data.Map.lookup k fm of
+  case Map.lookup k fm of
     Just x -> x
-    Nothing -> error $ msg ++ ": could not find key " ++ (show k)
+    Nothing -> error $ msg ++ ": could not find key " ++ show k
