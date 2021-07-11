@@ -20,7 +20,7 @@ test_readMIMETypes =
         exp' @=? guessType mtd strict inp
       fe = \strict inp exp' -> TestCase $ do
         mtd <- omtd
-        (sort exp') @=? sort (guessAllExtensions mtd strict inp)
+        sort exp' @=? sort (guessAllExtensions mtd strict inp)
    in [ f True "foo.bar.baz" (Nothing, Nothing),
         f True "" (Nothing, Nothing),
         f True "foo.ez" (Just "application/andrew-inset", Nothing),
@@ -34,7 +34,7 @@ test_readMIMETypes =
 
 test_guessAllExtensions :: [Test]
 test_guessAllExtensions =
-  let f strict inp exp' = TestCase $ (sort exp') @=? sort (guessAllExtensions defaultmtd strict inp)
+  let f strict inp exp' = TestCase $ sort exp' @=? sort (guessAllExtensions defaultmtd strict inp)
    in [ f True "" [],
         f True "foo" [],
         f True "application/octet-stream" [".obj", ".so", ".bin", ".a", ".dll", ".exe", ".o"],

@@ -26,21 +26,21 @@ mf fn exp' conf = TestLabel fn $
 
 test_inflate :: [Test]
 test_inflate =
-  let f fn exp' conv = mf fn exp' (conv . snd . forceEither . read_header)
-   in [ f "t1.gz" "Test 1" inflate_string,
-        f "t1.gz" 6 (length . inflate_string),
+  let f fn exp' conv = mf fn exp' (conv . snd . forceEither . readHeader)
+   in [ f "t1.gz" "Test 1" inflateString,
+        f "t1.gz" 6 (length . inflateString),
         f
           "t1.gz"
           ( "Test 1",
             "\x19\xf8\x27\x99\x06\x00\x00\x00"
           )
-          inflate_string_remainder,
-        f "empty.gz" "" inflate_string
+          inflateStringRemainder,
+        f "empty.gz" "" inflateString
       ]
 
 test_header :: [Test]
 test_header =
-  let f fn exp' = mf fn exp' (fst . forceEither . read_header)
+  let f fn exp' = mf fn exp' (fst . forceEither . readHeader)
    in [ f
           "t1.gz"
           Header

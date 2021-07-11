@@ -14,7 +14,7 @@ import Test.HUnit
 
 test_flipM :: [Test]
 test_flipM =
-  let f inp exp' = TestCase $ (M.fromList exp') @=? flipM (M.fromList inp)
+  let f inp exp' = TestCase $ M.fromList exp' @=? flipM (M.fromList inp)
    in [ f ([] :: [(Int, Int)]) ([] :: [(Int, [Int])]),
         f [("a", "b")] [("b", ["a"])],
         f

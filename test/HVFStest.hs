@@ -87,18 +87,16 @@ test_chroot =
               ["file3.txt", "test.txt", "dir2"]
                 `ioeq` vGetDirectoryContents x "."
           ),
-        f "cwd tests" $
-          ( \x -> do
-              a <- vGetDirectoryContents x (sep "/")
-              ["file3.txt", "test.txt", "dir2"] @=? a
-              vSetCurrentDirectory x (sep "/dir2")
-              cwd <- vGetCurrentDirectory x
-              sep "/dir2" @=? cwd
-              y <- vGetDirectoryContents x "."
-              [] @=? y
-              vSetCurrentDirectory x ".."
-              sep "/" `ioeq` vGetCurrentDirectory x
-          )
+        f "cwd tests" $ \x -> do
+          a <- vGetDirectoryContents x (sep "/")
+          ["file3.txt", "test.txt", "dir2"] @=? a
+          vSetCurrentDirectory x (sep "/dir2")
+          cwd <- vGetCurrentDirectory x
+          sep "/dir2" @=? cwd
+          y <- vGetDirectoryContents x "."
+          [] @=? y
+          vSetCurrentDirectory x ".."
+          sep "/" `ioeq` vGetCurrentDirectory x
       ]
 
 test_structure :: [Test]
@@ -111,7 +109,7 @@ test_structure =
           "root"
           ( \x ->
               ["test.txt", "file2.txt", "emptydir", "dir1"]
-                `ioeq` vGetDirectoryContents x (sep ("/"))
+                `ioeq` vGetDirectoryContents x (sep "/")
           ),
         f
           "dot"

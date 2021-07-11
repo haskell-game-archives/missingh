@@ -32,22 +32,20 @@ touch :: String -> IO ()
 touch x = writeFile (sep x) ""
 
 globtest :: IO a -> IO a
-globtest thetest = 
-    bracket_ (setupfs)
-             (recursiveRemove SystemFS bp)
-             thetest
-    where setupfs =
-              do mapM_ (\x -> createDirectory (sep x))
-                       [bp, bp ++ "/a", bp ++ "/aab", bp ++ "/aaa",
-                        bp ++ "/ZZZ", bp ++ "/a/bcd",
-                        bp ++ "/a/bcd/efg"]
-                 mapM_ touch [bp ++ "/a/D", bp ++ "/aab/F", bp ++ "/aaa/zzzF",
-                              bp ++ "/a/bcd/EF", bp ++ "/a/bcd/efg/ha",
-                             bp ++ "/a/foo", bp ++ "/a/afoo",
-                             bp ++ "/a/a-foo", bp ++ "/a/a.foo"]
+globtest =  bracket_ setupfs (recursiveRemove SystemFS bp)
+  where
+    setupfs = do
+      mapM_ (createDirectory . sep)
+            [bp, bp ++ "/a", bp ++ "/aab", bp ++ "/aaa",
+            bp ++ "/ZZZ", bp ++ "/a/bcd",
+            bp ++ "/a/bcd/efg"]
+      mapM_ touch [bp ++ "/a/D", bp ++ "/aab/F", bp ++ "/aaa/zzzF",
+                  bp ++ "/a/bcd/EF", bp ++ "/a/bcd/efg/ha",
+                  bp ++ "/a/foo", bp ++ "/a/afoo",
+                  bp ++ "/a/a-foo", bp ++ "/a/a.foo"]
 #if !(defined(mingw32_HOST_OS) || defined(mingw32_TARGET_OS) || defined(__MINGW32__))
-                 createSymbolicLink (preppath "broken") (preppath "sym1")
-                 createSymbolicLink (preppath "broken") (preppath "sym2")
+      createSymbolicLink (preppath "broken") (preppath "sym1")
+      createSymbolicLink (preppath "broken") (preppath "sym2")
 #endif
 
 eq :: (Show a, Ord a) => String -> [a] -> [a] -> Assertion

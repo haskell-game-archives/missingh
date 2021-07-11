@@ -34,7 +34,7 @@ test_maybeToEither =
 test_forceEither :: [Test]
 test_forceEither =
   let f msg inp exp' = TestLabel msg $ TestCase $ assertEqual "" exp' inp
-   in [ f "Right" (forceEither ((Right "foo") :: Either Int String)) "foo",
+   in [ f "Right" (forceEither (Right "foo" :: Either Int String)) "foo",
         TestLabel "Left" $ TestCase $ assertRaises ((== "\"wrong\"") . errorCallMsg) ("" @=? forceEither (Left "wrong"))
       ]
 

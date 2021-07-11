@@ -73,7 +73,7 @@ test_escapeRe =
             assertEqual
               [chr i]
               (Just [])
-              (matchRegex (mkRegex $ escapeRe $ [chr i]) [chr i])
+              (matchRegex (mkRegex $ escapeRe [chr i]) [chr i])
     )
     [1 .. 255]
     ++ [ TestCase $

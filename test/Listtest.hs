@@ -16,7 +16,7 @@ import Test.HUnit
 test_delFromAL :: [Test]
 test_delFromAL =
   let f :: [(String, Int)] -> [(String, Int)] -> Test
-      f inp exp' = TestCase $ exp' @=? (delFromAL inp "testkey")
+      f inp exp' = TestCase $ exp' @=? delFromAL inp "testkey"
    in [ f [] [],
         f [("one", 1)] [("one", 1)],
         f [("1", 1), ("2", 2), ("testkey", 3)] [("1", 1), ("2", 2)],
@@ -31,7 +31,7 @@ test_delFromAL =
 test_addToAL :: [Test]
 test_addToAL =
   let f :: [(String, Int)] -> [(String, Int)] -> Test
-      f inp exp' = TestCase $ exp' @=? (addToAL inp "testkey" 101)
+      f inp exp' = TestCase $ exp' @=? addToAL inp "testkey" 101
    in [ f [] [("testkey", 101)],
         f [("testkey", 5)] [("testkey", 101)],
         f [("testkey", 5), ("testkey", 6)] [("testkey", 101)]
@@ -128,7 +128,7 @@ test_trunc =
 
 test_contains :: [Test]
 test_contains =
-  let f msg sub testlist exp' = TestCase $ assertEqual msg exp' (isInfixOf sub testlist)
+  let f msg sub testlist exp' = TestCase $ assertEqual msg exp' (sub `isInfixOf` testlist)
    in [ f "t1" "Haskell" "I really like Haskell." True,
         f "t2" "" "Foo" True,
         f "t3" "" "" True,
@@ -167,11 +167,11 @@ test_subIndex :: [Test]
 test_subIndex =
   let f item inp exp' = TestCase $ exp' @=? subIndex item inp
    in [ f "foo" "asdfoobar" (Just 3),
-        f "foo" [] (Nothing),
+        f "foo" [] Nothing,
         f "" [] (Just 0),
         f "" "asdf" (Just 0),
         f "test" "asdftestbartest" (Just 4),
-        f [(1 :: Int), 2] [0, 5, 3, 2, 1, 2, 4] (Just 4)
+        f [1 :: Int, 2] [0, 5, 3, 2, 1, 2, 4] (Just 4)
       ]
 
 test_fixedWidth :: [Test]
@@ -179,11 +179,8 @@ test_fixedWidth =
   let 
     f :: (Eq a, Show a) => [Int] -> [a] -> [[a]] -> Test
     f inplen inplist exp' =
-        TestLabel
-          ( (show inplen) ++ ", "
-              ++ (show inplist)
-          )
-          $ TestCase $
+        TestLabel (show inplen ++ ", " ++ show inplist) $
+          TestCase $
             wholeMap (fixedWidth inplen) inplist @=? exp'
    in [ f @Int [] [] [],
         f @Int [1] [5] [[5]],
@@ -222,8 +219,8 @@ test_spanList :: [Test]
 test_spanList =
   let f func inp exp' = TestLabel (show inp) $ TestCase $ exp' @=? spanList func inp
    in [ f (isInfixOf "foo") "Testfoobar" ("Testf", "oobar"),
-        f (\_ -> True) "Testasdf" ("Testasdf", ""),
-        f (\_ -> False) "Testasdf" ("", "Testasdf"),
+        f (const True) "Testasdf" ("Testasdf", ""),
+        f (const False) "Testasdf" ("", "Testasdf"),
         f (isInfixOf "foo") "" ("", ""),
         f (isInfixOf "foo") "foo" ("f", "oo")
       ]

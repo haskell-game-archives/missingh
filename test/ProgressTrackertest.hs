@@ -12,6 +12,7 @@ module ProgressTrackertest (tests) where
 import Control.Concurrent.MVar
 import Data.Progress.Tracker
 import Test.HUnit
+import Control.Monad
 
 setup :: IO (Progress, MVar Integer)
 setup =
@@ -22,7 +23,7 @@ setup =
     return (po, timem)
 
 settime :: MVar a -> a -> IO ()
-settime timem newval = swapMVar timem newval >> return ()
+settime timem  = void . swapMVar timem
 
 test_incrP :: IO ()
 test_incrP =

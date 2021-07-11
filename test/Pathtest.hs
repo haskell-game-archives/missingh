@@ -12,6 +12,7 @@ module Pathtest (tests) where
 import System.FilePath (pathSeparator)
 import System.Path
 import Test.HUnit
+import Data.Bifunctor
 
 sep :: String -> String
 sep = map (\c -> if c == '/' then pathSeparator else c)
@@ -69,7 +70,7 @@ test_splitExt =
   let f inp' exp' = TestCase $ exp'' @=? splitExt inp
         where
           inp = sep inp'
-          exp'' = (\(x, y) -> (sep x, y)) exp'
+          exp'' = first sep exp'
    in [ f "" ("", ""),
         f "/usr/local" ("/usr/local", ""),
         f "../foo.txt" ("../foo", ".txt"),
