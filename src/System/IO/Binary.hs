@@ -1,4 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 
 {- arch-tag: I/O utilities, binary tools
 Copyright (c) 2004-2011 John Goerzen <jgoerzen@complete.org>
@@ -71,16 +72,17 @@ module System.IO.Binary(
                        hFullBlockInteract, fullBlockInteract
                         ) where
 
-import Data.Word (Word8())
-import Foreign.C.String (peekCStringLen, withCString)
-import Foreign.C.Types (CChar())
+import Control.Monad
+import Data.Word
+import Foreign.C.String
+import Foreign.C.Types
 import Foreign.ForeignPtr
-import Foreign.Marshal.Array (peekArray, withArray)
+import Foreign.Marshal.Array
 import Foreign.Ptr
 import System.IO
 import System.IO.HVFS
 import System.IO.HVIO
-import System.IO.Unsafe (unsafeInterleaveIO)
+import System.IO.Unsafe
 
 {- | Provides support for handling binary blocks with convenient
 types.
@@ -88,27 +90,28 @@ types.
 This module provides implementations for Strings and for [Word8] (lists of
 Word8s). -}
 class (Eq a, Show a) => BinaryConvertible a where
-    toBuf :: [a] -> (Ptr CChar -> IO c) -> IO c
-    fromBuf :: Int -> (Ptr CChar -> IO Int) -> IO [a]
+  toBuf :: [a] -> (Ptr CChar -> IO c) -> IO c
+  fromBuf :: Int -> (Ptr CChar -> IO Int) -> IO [a]
 
 instance BinaryConvertible Char where
-    toBuf = withCString
-    fromBuf len func =
-        do fbuf <- mallocForeignPtrArray (len + 1)
-           withForeignPtr fbuf handler
-        where handler ptr =
-                  do bytesread <- func ptr
-                     peekCStringLen (ptr, bytesread)
+  toBuf = withCString
+  fromBuf len func = do
+    fbuf <- mallocForeignPtrArray (len + 1)
+    withForeignPtr fbuf handler
+    where
+      handler ptr = do
+        bytesread <- func ptr
+        peekCStringLen (ptr, bytesread)
 
 instance BinaryConvertible Word8 where
-    toBuf hslist func = withArray hslist (\ptr -> func (castPtr ptr))
-    fromBuf len func =
-        do (fbuf::(ForeignPtr Word8)) <- mallocForeignPtrArray (len + 1)
-           withForeignPtr fbuf handler
-        where handler ptr =
-                  do bytesread <- func (castPtr ptr)
-                     peekArray bytesread ptr
-
+  toBuf hslist func = withArray hslist (func . castPtr)
+  fromBuf len func = do
+    fbuf <- mallocForeignPtrArray @Word8 (len + 1)
+    withForeignPtr fbuf handler
+    where
+      handler ptr = do
+        bytesread <- func (castPtr ptr)
+        peekArray bytesread ptr
 
 --  **************************************************
 --  Binary Files
@@ -150,12 +153,12 @@ the requested number of bytes when EOF is encountered. -}
 hFullGetBufStr :: (HVIO a, BinaryConvertible b) => a -> Int -> IO [b]
 hFullGetBufStr _ 0 = return []
 hFullGetBufStr f count = do
-                         thisstr <- hGetBufStr f count
-                         if thisstr == []
-                            then return []
-                            else do
-                                 remainder <- hFullGetBufStr f (count - (length thisstr))
-                                 return (thisstr ++ remainder)
+  thisstr <- hGetBufStr f count
+  if null thisstr
+    then return []
+    else do
+      remainder <- hFullGetBufStr f (count - length thisstr)
+      return (thisstr ++ remainder)
 
 -- | An alias for 'hFullGetBufStr' 'stdin'
 fullGetBufStr :: BinaryConvertible b => Int -> IO [b]
@@ -172,8 +175,8 @@ Think of this function as:
 hPutBlocks :: (HVIO a, BinaryConvertible b) => a -> [[b]] -> IO ()
 hPutBlocks _ [] = return ()
 hPutBlocks h (x:xs) = do
-                      hPutBufStr h x
-                      hPutBlocks h xs
+  hPutBufStr h x
+  hPutBlocks h xs
 
 {- | An alias for 'hPutBlocks' 'stdout'
 putBlocks :: (BinaryConvertible b) => [[b]] -> IO ()
@@ -198,14 +201,13 @@ fullGetBlocks :: BinaryConvertible b => Int -> IO [[b]]
 fullGetBlocks = hFullGetBlocks stdin
 
 hGetBlocksUtil :: (HVIO a, BinaryConvertible b) => (a -> Int -> IO [b]) -> a -> Int -> IO [[b]]
-hGetBlocksUtil readfunc h count =
-    unsafeInterleaveIO $ do
-                       block <- readfunc h count
-                       if block == []
-                          then return []
-                          else do
-                               remainder <- hGetBlocksUtil readfunc h count
-                               return (block : remainder)
+hGetBlocksUtil readfunc h count = unsafeInterleaveIO $ do
+  block <- readfunc h count
+  if null block
+    then return []
+    else do
+      remainder <- hGetBlocksUtil readfunc h count
+      return (block : remainder)
 
 {- | Binary block-based interaction.  This is useful for scenarios that
 take binary blocks, manipulate them in some way, and then write them
@@ -214,7 +216,7 @@ is the size of input binary blocks.  This function uses 'hGetBlocks'
 internally.
 -}
 hBlockInteract :: (HVIO a, HVIO d, BinaryConvertible b, BinaryConvertible c) =>
-                  Int -> a -> d -> ([[b]] -> [[c]]) -> IO ()
+  Int -> a -> d -> ([[b]] -> [[c]]) -> IO ()
 hBlockInteract = hBlockInteractUtil hGetBlocks
 
 -- | An alias for 'hBlockInteract' over 'stdin' and 'stdout'
@@ -224,21 +226,20 @@ blockInteract x = hBlockInteract x stdin stdout
 {- | Same as 'hBlockInteract', but uses 'hFullGetBlocks' instead of
 'hGetBlocks' internally. -}
 hFullBlockInteract :: (HVIO a, HVIO d, BinaryConvertible b, BinaryConvertible c) =>
-                      Int -> a -> d -> ([[b]] -> [[c]]) -> IO ()
+  Int -> a -> d -> ([[b]] -> [[c]]) -> IO ()
 hFullBlockInteract = hBlockInteractUtil hFullGetBlocks
 
 -- | An alias for 'hFullBlockInteract' over 'stdin' and 'stdout'
 fullBlockInteract :: (BinaryConvertible b, BinaryConvertible c) =>
-                     Int -> ([[b]] -> [[c]]) -> IO ()
+  Int -> ([[b]] -> [[c]]) -> IO ()
 fullBlockInteract x = hFullBlockInteract x stdin stdout
 
 hBlockInteractUtil :: (HVIO a, HVIO d, BinaryConvertible b, BinaryConvertible c) =>
                       (a -> Int -> IO [[b]]) -> Int ->
                       a -> d -> ([[b]] -> [[c]]) -> IO ()
-hBlockInteractUtil blockreader blocksize hin hout func =
-    do
-    blocks <- blockreader hin blocksize
-    hPutBlocks hout (func blocks)
+hBlockInteractUtil blockreader blocksize hin hout func = do
+  blocks <- blockreader hin blocksize
+  hPutBlocks hout (func blocks)
 
 {- | Copies everything from the input handle to the output handle using binary
 blocks of the given size.  This was once the following
@@ -253,15 +254,15 @@ In more recent versions of MissingH, it uses a more optimized routine that
 avoids ever having to convert the binary buffer at all.
 -}
 hBlockCopy :: (HVIO a, HVIO b) => Int -> a -> b -> IO ()
-hBlockCopy bs hin hout =
-    do (fbuf::ForeignPtr CChar) <- mallocForeignPtrArray (bs + 1)
-       withForeignPtr fbuf handler
-    where handler ptr =
-              do bytesread <- vGetBuf hin ptr bs
-                 if bytesread > 0
-                    then do vPutBuf hout ptr bytesread
-                            handler ptr
-                    else return ()
+hBlockCopy bs hin hout = do
+  fbuf <- mallocForeignPtrArray @CChar (bs + 1)
+  withForeignPtr fbuf handler
+  where
+    handler ptr = do
+      bytesread <- vGetBuf hin ptr bs
+      when (bytesread > 0) $ do
+        vPutBuf hout ptr bytesread
+        handler ptr
 
 {- | Copies from 'stdin' to 'stdout' using binary blocks of the given size.
 An alias for 'hBlockCopy' over 'stdin' and 'stdout'
