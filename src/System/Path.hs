@@ -1,5 +1,4 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE Safe #-}
 
 {- arch-tag: Path utilities main file
 Copyright (C) 2004-2011 John Goerzen <jgoerzen@complete.org>
@@ -65,7 +64,7 @@ splitExt path =
       slashindex = alwaysElemRIndex pathSeparator path
    in if dotindex <= slashindex
         then (path, "")
-        else ((take dotindex path), (drop dotindex path))
+        else splitAt dotindex path
 
 -- | Make an absolute, normalized version of a path with all double slashes,
 -- dot, and dotdot entries removed.
@@ -117,20 +116,20 @@ secureAbsNormPath base s = do
 mktmpdir :: String -> IO String
 
 #if !(defined(mingw32_HOST_OS) || defined(mingw32_TARGET_OS) || defined(__MINGW32__))
-mktmpdir x =
-    do y <- mkstemp x
-       let (dirname, h) = y
-       hClose h
-       removeFile dirname
-       createDirectory dirname 0o700
-       return dirname
+mktmpdir x = do
+  y <- mkstemp x
+  let (dirname, h) = y
+  hClose h
+  removeFile dirname
+  createDirectory dirname 0o700
+  return dirname
 #else
-mktmpdir x =
-    do (fp, h) <- openTempFile "" x
-       hClose h
-       removeFile fp
-       createDirectory fp
-       return fp
+mktmpdir x = do
+  (fp, h) <- openTempFile "" x
+  hClose h
+  removeFile fp
+  createDirectory fp
+  return fp
 #endif
 
 -- | Creates a temporary directory for your use via 'mktmpdir',
@@ -148,15 +147,13 @@ brackettmpdir x action = do
 -- executes the given I\/O action, then changes back to the original directory,
 -- even if the I\/O action raised an exception.
 bracketCWD :: FilePath -> IO a -> IO a
-bracketCWD fp action =
-  do
-    oldcwd <- getCurrentDirectory
-    setCurrentDirectory fp
-    finally action (setCurrentDirectory oldcwd)
+bracketCWD fp action = do
+  oldcwd <- getCurrentDirectory
+  setCurrentDirectory fp
+  finally action (setCurrentDirectory oldcwd)
 
 -- | Runs the given I\/O action with the CWD set to the given tmp dir,
 -- removing the tmp dir and changing CWD back afterwards, even if there
 -- was an exception.
 brackettmpdirCWD :: String -> IO a -> IO a
-brackettmpdirCWD template action =
-  brackettmpdir template (\newdir -> bracketCWD newdir action)
+brackettmpdirCWD template action = brackettmpdir template (`bracketCWD` action)
