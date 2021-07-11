@@ -9,37 +9,34 @@ All rights reserved.
 For license and copyright information, see the file LICENSE
 -}
 
-{- |
-   Module     : System.Daemon
-   Copyright  : Copyright (C) 2005-2011 John Goerzen
-   SPDX-License-Identifier: BSD-3-Clause
-
-   Stability  : provisional
-   Portability: portable to platforms with POSIX process\/signal tools
-
-Tools for writing daemons\/server processes
-
-Written by John Goerzen, jgoerzen\@complete.org
-
-Please note: Most of this module is not compatible with Hugs.
-
-Messages from this module are logged under @System.Daemon@.  See
-'System.Log.Logger' for details.
-
-Based on background
-from <http://www.erlenstar.demon.co.uk/unix/faq_2.html#SEC16> and
-<http://www.haskell.org/hawiki/HaskellUnixDaemon>.
-
-This module is not available on Windows.
--}
-
+-- |
+--   Module     : System.Daemon
+--   Copyright  : Copyright (C) 2005-2011 John Goerzen
+--   SPDX-License-Identifier: BSD-3-Clause
+--
+--   Stability  : provisional
+--   Portability: portable to platforms with POSIX process\/signal tools
+--
+-- Tools for writing daemons\/server processes
+--
+-- Written by John Goerzen, jgoerzen\@complete.org
+--
+-- Please note: Most of this module is not compatible with Hugs.
+--
+-- Messages from this module are logged under @System.Daemon@.  See
+-- 'System.Log.Logger' for details.
+--
+-- Based on background
+-- from <http://www.erlenstar.demon.co.uk/unix/faq_2.html#SEC16> and
+-- <http://www.haskell.org/hawiki/HaskellUnixDaemon>.
+--
+-- This module is not available on Windows.
 module System.Daemon (
-
 #if !(defined(mingw32_HOST_OS) || defined(mingw32_TARGET_OS) || defined(__MINGW32__))
-        detachDaemon
+  detachDaemon
 #endif
-                   )
-                       where
+) where
+
 #if !(defined(mingw32_HOST_OS) || defined(mingw32_TARGET_OS) || defined(__MINGW32__))
 
 import           System.Directory
@@ -47,7 +44,6 @@ import           System.Exit
 import           System.Log.Logger
 import           System.Posix.IO
 import           System.Posix.Process
-
 
 trap :: IO a -> IO a
 trap = traplogging "System.Daemon" ERROR "detachDaemon"
@@ -69,21 +65,21 @@ I /highly/ suggest running this function before starting any threads.
 Note that this is not intended for a daemon invoked from inetd(1).
 -}
 detachDaemon :: IO ()
-detachDaemon = trap $
-               do forkProcess child1
-                  exitImmediately ExitSuccess
+detachDaemon = trap $ do
+  _ <- forkProcess child1
+  exitImmediately ExitSuccess
 
 child1 :: IO ()
-child1 = trap $
-    do createSession
-       forkProcess child2
-       exitImmediately ExitSuccess
+child1 = trap $ do
+  _ <- createSession
+  _ <- forkProcess child2
+  exitImmediately ExitSuccess
 
 child2 :: IO ()
-child2 = trap $
-    do setCurrentDirectory "/"
-       mapM_ closeFd [stdInput, stdOutput, stdError]
-       nullFd <- openFd "/dev/null" ReadWrite Nothing defaultFileFlags
-       mapM_ (dupTo nullFd) [stdInput, stdOutput, stdError]
-       closeFd nullFd
+child2 = trap $ do
+  setCurrentDirectory "/"
+  mapM_ closeFd [stdInput, stdOutput, stdError]
+  nullFd <- openFd "/dev/null" ReadWrite Nothing defaultFileFlags
+  mapM_ (dupTo nullFd) [stdInput, stdOutput, stdError]
+  closeFd nullFd
 #endif

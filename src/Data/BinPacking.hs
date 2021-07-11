@@ -42,11 +42,12 @@ import Control.Monad.Error
 {- | Potential errors returned as Left values by 'BinPacker' functions. 
 Calling 'show' on this value will produce a nice error message suitable for
 display. -}
-data (Num size, Ord size, Show size, Show obj) => BinPackerError size obj = 
-    BPTooFewBins [(size, obj)]                -- ^ Ran out of bins; attached value is the list of objects that do not fit
+data (Num size, Ord size, Show size, Show obj) =>
+  BinPackerError size obj
+    =  BPTooFewBins [(size, obj)]       -- ^ Ran out of bins; attached value is the list of objects that do not fit
     | BPSizeTooLarge size (size, obj)   -- ^ Bin size1 exceeded by at least the given object and size
     | BPOther String                    -- ^ Other error
-      deriving (Eq, Read)
+    deriving (Eq, Read)
 
 instance (Num size, Ord size, Show size, Show obj) => Show (BinPackerError size obj) where
     show (BPTooFewBins _) = "Too few bins"
