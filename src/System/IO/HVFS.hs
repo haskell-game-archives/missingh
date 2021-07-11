@@ -55,7 +55,7 @@ module System.IO.HVFS(-- * Implementation Classes \/ Types
                     )
 where
 
-import qualified Control.Exception (catch, IOException)
+import qualified Control.Exception
 import System.IO.HVIO
 import System.Time.Utils
 import System.IO
@@ -63,6 +63,7 @@ import System.IO.Error
 import System.IO.PlafCompat
 import System.Time
 import qualified System.Directory as D
+import Data.Functor
 
 #if MIN_VERSION_directory(1,2,0)
 import Data.Time.Clock.POSIX ( utcTimeToPOSIXSeconds )
@@ -251,14 +252,15 @@ class HVFS a => HVFSOpenable a where
     vWriteFile :: a -> FilePath -> String -> IO ()
     vOpenBinaryFile :: a -> FilePath -> IOMode -> IO HVFSOpenEncap
 
-    vReadFile h fp =
-        do oe <- vOpen h fp ReadMode
-           withOpen oe (\fh -> vGetContents fh)
+    vReadFile h fp = do
+      oe <- vOpen h fp ReadMode
+      withOpen oe vGetContents
 
-    vWriteFile h fp s =
-        do oe <- vOpen h fp WriteMode
-           withOpen oe (\fh -> do vPutStr fh s
-                                  vClose fh)
+    vWriteFile h fp s = do
+      oe <- vOpen h fp WriteMode
+      withOpen oe $ \fh -> do
+                              vPutStr fh s
+                              vClose fh
 
     -- | Open a file in binary mode.
     vOpenBinaryFile = vOpen
@@ -286,8 +288,7 @@ instance HVFSStat FileStatus where
     vIsSymbolicLink = isSymbolicLink
     vIsSocket = isSocket
 
-data SystemFS = SystemFS
-              deriving (Eq, Show)
+data SystemFS = SystemFS deriving (Eq, Show)
 
 instance HVFS SystemFS where
     vGetCurrentDirectory _ = D.getCurrentDirectory
@@ -300,9 +301,9 @@ instance HVFS SystemFS where
     vRenameDirectory _ = D.renameDirectory
     vRemoveFile _ = D.removeFile
     vRenameFile _ = D.renameFile
-    vGetFileStatus _ fp = getFileStatus fp >>= return . HVFSStatEncap
+    vGetFileStatus _ fp = getFileStatus fp <&> HVFSStatEncap
 #if !(defined(mingw32_HOST_OS) || defined(mingw32_TARGET_OS) || defined(__MINGW32__))
-    vGetSymbolicLinkStatus _ fp = getSymbolicLinkStatus fp >>= return . HVFSStatEncap
+    vGetSymbolicLinkStatus _ fp = getSymbolicLinkStatus fp <&> HVFSStatEncap
 #else
     -- No symlinks on Windows; just get the file status directly
     vGetSymbolicLinkStatus = vGetFileStatus
@@ -324,5 +325,5 @@ instance HVFS SystemFS where
 #endif
 
 instance HVFSOpenable SystemFS where
-    vOpen _ fp iomode = openFile fp iomode >>= return . HVFSOpenEncap
-    vOpenBinaryFile _ fp iomode = openBinaryFile fp iomode >>= return . HVFSOpenEncap
+    vOpen _ fp iomode = openFile fp iomode <&> HVFSOpenEncap
+    vOpenBinaryFile _ fp iomode = openBinaryFile fp iomode <&> HVFSOpenEncap
