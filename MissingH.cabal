@@ -126,9 +126,6 @@ library
     System.Time.Utils
     Text.ParserCombinators.Parsec.Utils
 
-  default-extensions:
-    OverlappingInstances
-
   other-extensions:
     CPP
     Safe

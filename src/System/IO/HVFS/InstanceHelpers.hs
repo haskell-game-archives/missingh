@@ -1,4 +1,5 @@
 {-# LANGUAGE Safe #-}
+{-# LANGUAGE LambdaCase #-}
 {- arch-tag: HVFS instance helpers
 Copyright (c) 2004-2011 John Goerzen <jgoerzen@complete.org>
 
@@ -112,12 +113,12 @@ nice_slice path
 {- | Gets a full path, after investigating the cwd.
 -}
 getFullPath :: HVFS a => a -> String -> IO String
-getFullPath fs path =
-    do cwd <- vGetCurrentDirectory fs
-       case (absNormPath cwd path) of
-           Nothing -> vRaiseError fs doesNotExistErrorType
-                        ("Trouble normalizing path " ++ path) (Just (cwd </> path))
-           Just newpath -> return newpath
+getFullPath fs path = do
+  cwd' <- vGetCurrentDirectory fs
+  case absNormPath cwd' path of
+    Nothing -> vRaiseError fs doesNotExistErrorType
+                ("Trouble normalizing path " ++ path) (Just (cwd' </> path))
+    Just newpath -> return newpath
 
 {- | Gets the full path via 'getFullPath', then splits it via 'nice_slice'.
 -}
@@ -145,8 +146,8 @@ findMelem x path
           | zs == [[pathSeparator]] = Right y
           | otherwise = case y of
               MemoryFile _ -> Left $ "Attempt to look up name " ++ head zs ++ " in file"
-              MemoryDirectory y ->
-                let newentry = case lookup (head zs) y of
+              MemoryDirectory y' ->
+                let newentry = case lookup (head zs) y' of
                                   Nothing -> Left $ "Couldn't find entry " ++ head zs
                                   Just a -> Right a
                 in do newobj <- newentry
@@ -167,47 +168,42 @@ getMelem x s =
            Just newpath -> findMelem x newpath
 
 instance HVFS MemoryVFS where
-    vGetCurrentDirectory x = readIORef $ cwd x
-    vSetCurrentDirectory x fp =
-        do curpath <- vGetCurrentDirectory x
-           -- Make sure new dir is valid
-           newdir <- getMelem x fp
-           case newdir of
-               (MemoryFile _) -> vRaiseError x doesNotExistErrorType
-                                 ("Attempt to cwd to non-directory " ++ fp)
-                                 (Just fp)
-               (MemoryDirectory _) ->
-                   case absNormPath curpath fp of
-                       Nothing -> -- should never happen due to above getMelem call
-                                  vRaiseError x illegalOperationErrorType
-                                              "Bad internal error" (Just fp)
-                       Just y -> writeIORef (cwd x) y
-    vGetFileStatus x fp =
-        do elem <- getMelem x fp
-           case elem of
-                     (MemoryFile y) -> return $ HVFSStatEncap $
-                                             SimpleStat {isFile = True,
-                                                        fileSize = (genericLength y)}
-                     (MemoryDirectory _) -> return $ HVFSStatEncap $
-                                             SimpleStat {isFile = False,
-                                                        fileSize = 0}
-    vGetDirectoryContents x fp =
-        do elem <- getMelem x fp
-           case elem of
-                MemoryFile _ -> vRaiseError x doesNotExistErrorType
-                                  "Can't list contents of a file"
-                                  (Just fp)
-                MemoryDirectory c -> return $ map fst c
+  vGetCurrentDirectory x = readIORef $ cwd x
+
+  vSetCurrentDirectory x fp = do
+    curpath <- vGetCurrentDirectory x
+    -- Make sure new dir is valid
+    getMelem x fp >>= \case
+      MemoryFile _ -> vRaiseError x doesNotExistErrorType
+                        ("Attempt to cwd to non-directory " ++ fp)
+                        (Just fp)
+      MemoryDirectory _ ->
+        case absNormPath curpath fp of
+          Nothing -> -- should never happen due to above getMelem call
+                    vRaiseError x illegalOperationErrorType "Bad internal error" (Just fp)
+          Just y -> writeIORef (cwd x) y
+
+  vGetFileStatus x fp = do
+    getMelem x fp >>= \case
+      MemoryFile y -> return $ HVFSStatEncap $
+                              SimpleStat { isFile = True, fileSize = genericLength y }
+      MemoryDirectory _ -> return $ HVFSStatEncap $
+                              SimpleStat { isFile = False, fileSize = 0 }
+
+  vGetDirectoryContents x fp = do
+    getMelem x fp >>= \case
+      MemoryFile _ -> vRaiseError x doesNotExistErrorType
+                        "Can't list contents of a file"
+                        (Just fp)
+      MemoryDirectory c -> return $ map fst c
 
 instance HVFSOpenable MemoryVFS where
-    vOpen x fp (ReadMode) =
-        do elem <- getMelem x fp
-           case elem of
-                MemoryDirectory _ -> vRaiseError x doesNotExistErrorType
-                                      "Can't open a directory"
-                                      (Just fp)
-                MemoryFile y -> newStreamReader y >>= return . HVFSOpenEncap
-    vOpen x fp _ = vRaiseError x permissionErrorType
-                     "Only ReadMode is supported with MemoryVFS files"
-                     (Just fp)
-
+  vOpen x fp (ReadMode) = do
+    getMelem x fp >>= \case
+      MemoryDirectory _ -> vRaiseError x doesNotExistErrorType
+                            "Can't open a directory"
+                            (Just fp)
+      MemoryFile y -> newStreamReader y >>= return . HVFSOpenEncap
+  vOpen x fp _ = vRaiseError x permissionErrorType
+                    "Only ReadMode is supported with MemoryVFS files"
+                    (Just fp)
