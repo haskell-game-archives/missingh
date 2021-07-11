@@ -1,7 +1,7 @@
 -- arch-tag: Command utilities main file
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE LambdaCase #-}
 
 {-
 Copyright (c) 2004-2011 John Goerzen <jgoerzen@complete.org>
@@ -105,9 +105,8 @@ import System.Posix.Signals
 #endif
 import System.Posix.Types
 import System.IO
-import Control.Concurrent(forkIO)
-import Control.Exception(finally)
-import qualified Control.Exception(try, IOException)
+import Control.Concurrent
+import Control.Exception
 
 data PipeMode = ReadFromPipe | WriteToPipe
 
@@ -136,9 +135,9 @@ Note: this function logs as pipeFrom.
 
 Not available on Windows. -}
 pipeLinesFrom :: FilePath -> [String] -> IO (PipeHandle, [String])
-pipeLinesFrom fp args =
-    do (pid, c) <- pipeFrom fp args
-       return $ (pid, lines c)
+pipeLinesFrom fp args = do
+  (pid, c) <- pipeFrom fp args
+  return (pid, lines c)
 #endif
 #endif
 
@@ -147,9 +146,9 @@ logRunning func fp args = debugM (logbase ++ "." ++ func) (showCmd fp args)
 
 warnFail :: [Char] -> FilePath -> [String] -> [Char] -> IO t
 warnFail funcname fp args msg =
-    let m = showCmd fp args ++ ": " ++ msg
-        in do warningM (logbase ++ "." ++ funcname) m
-              fail m
+  let m = showCmd fp args ++ ": " ++ msg
+   in do warningM (logbase ++ "." ++ funcname) m
+         fail m
 
 #if !(defined(mingw32_HOST_OS) || defined(mingw32_TARGET_OS) || defined(__MINGW32__))
 #ifndef __HUGS__
@@ -163,21 +162,21 @@ This function logs as pipeFrom.
 Not available on Windows or with Hugs.
 -}
 hPipeFrom :: FilePath -> [String] -> IO (PipeHandle, Handle)
-hPipeFrom fp args =
-    do pipepair <- createPipe
-       logRunning "pipeFrom" fp args
-       let childstuff = do _ <- dupTo (snd pipepair) stdOutput
-                           closeFd (fst pipepair)
-                           executeFile fp True args Nothing
-       p <- Control.Exception.try (forkProcess childstuff)
-       -- parent
-       pid <- case p of
-                  Right x -> return x
-                  Left (e :: Control.Exception.IOException) -> warnFail "pipeFrom" fp args $
-                            "Error in fork: " ++ show e
-       closeFd (snd pipepair)
-       h <- fdToHandle (fst pipepair)
-       return (PipeHandle pid fp args "pipeFrom", h)
+hPipeFrom fp args = do
+  pipepair <- createPipe
+  logRunning "pipeFrom" fp args
+  let childstuff = do _ <- dupTo (snd pipepair) stdOutput
+                      closeFd (fst pipepair)
+                      executeFile fp True args Nothing
+  p <- try (forkProcess childstuff)
+  -- parent
+  pid <- case p of
+            Right x -> return x
+            Left (e :: IOException) -> warnFail "pipeFrom" fp args $
+                      "Error in fork: " ++ show e
+  closeFd (snd pipepair)
+  h <- fdToHandle (fst pipepair)
+  return (PipeHandle pid fp args "pipeFrom", h)
 #endif
 #endif
 
@@ -192,10 +191,10 @@ Zombies will result otherwise.
 Not available on Windows.
 -}
 pipeFrom :: FilePath -> [String] -> IO (PipeHandle, String)
-pipeFrom fp args =
-    do (pid, h) <- hPipeFrom fp args
-       c <- hGetContents h
-       return (pid, c)
+pipeFrom fp args = do
+  (pid, h) <- hPipeFrom fp args
+  c <- hGetContents h
+  return (pid, c)
 #endif
 #endif
 
@@ -212,21 +211,21 @@ This function logs as pipeTo.
 Not available on Windows.
 -}
 hPipeTo :: FilePath -> [String] -> IO (PipeHandle, Handle)
-hPipeTo fp args =
-    do pipepair <- createPipe
-       logRunning "pipeTo" fp args
-       let childstuff = do _ <- dupTo (fst pipepair) stdInput
-                           closeFd (snd pipepair)
-                           executeFile fp True args Nothing
-       p <- Control.Exception.try (forkProcess childstuff)
-       -- parent
-       pid <- case p of
-                   Right x -> return x
-                   Left (e :: Control.Exception.IOException) -> warnFail "pipeTo" fp args $
-                             "Error in fork: " ++ show e
-       closeFd (fst pipepair)
-       h <- fdToHandle (snd pipepair)
-       return (PipeHandle pid fp args "pipeTo", h)
+hPipeTo fp args = do
+  pipepair <- createPipe
+  logRunning "pipeTo" fp args
+  let childstuff = do _ <- dupTo (fst pipepair) stdInput
+                      closeFd (snd pipepair)
+                      executeFile fp True args Nothing
+  p <- try (forkProcess childstuff)
+  -- parent
+  pid <- case p of
+              Right x -> return x
+              Left (e :: IOException) -> warnFail "pipeTo" fp args $
+                        "Error in fork: " ++ show e
+  closeFd (fst pipepair)
+  h <- fdToHandle (snd pipepair)
+  return (PipeHandle pid fp args "pipeTo", h)
 #endif
 #endif
 
@@ -241,11 +240,10 @@ Zombies will result otherwise.
 Not available on Windows.
 -}
 pipeTo :: FilePath -> [String] -> String -> IO PipeHandle
-pipeTo fp args message =
-    do (pid, h) <- hPipeTo fp args
-       finally (hPutStr h message)
-               (hClose h)
-       return pid
+pipeTo fp args message = do
+  (pid, h) <- hPipeTo fp args
+  finally (hPutStr h message) (hClose h)
+  return pid
 #endif
 #endif
 
@@ -265,26 +263,26 @@ This function logs as pipeBoth.
 Not available on Windows.
 -}
 hPipeBoth :: FilePath -> [String] -> IO (PipeHandle, Handle, Handle)
-hPipeBoth fp args =
-    do frompair <- createPipe
-       topair <- createPipe
-       logRunning "pipeBoth" fp args
-       let childstuff = do _ <- dupTo (snd frompair) stdOutput
-                           closeFd (fst frompair)
-                           _ <- dupTo (fst topair) stdInput
-                           closeFd (snd topair)
-                           executeFile fp True args Nothing
-       p <- Control.Exception.try (forkProcess childstuff)
-       -- parent
-       pid <- case p of
-                   Right x -> return x
-                   Left (e :: Control.Exception.IOException) -> warnFail "pipeBoth" fp args $
-                             "Error in fork: " ++ show e
-       closeFd (snd frompair)
-       closeFd (fst topair)
-       fromh <- fdToHandle (fst frompair)
-       toh <- fdToHandle (snd topair)
-       return (PipeHandle pid fp args "pipeBoth", fromh, toh)
+hPipeBoth fp args = do
+  frompair <- createPipe
+  topair <- createPipe
+  logRunning "pipeBoth" fp args
+  let childstuff = do _ <- dupTo (snd frompair) stdOutput
+                      closeFd (fst frompair)
+                      _ <- dupTo (fst topair) stdInput
+                      closeFd (snd topair)
+                      executeFile fp True args Nothing
+  p <- try (forkProcess childstuff)
+  -- parent
+  pid <- case p of
+              Right x -> return x
+              Left (e :: IOException) -> warnFail "pipeBoth" fp args $
+                        "Error in fork: " ++ show e
+  closeFd (snd frompair)
+  closeFd (fst topair)
+  fromh <- fdToHandle (fst frompair)
+  toh <- fdToHandle (snd topair)
+  return (PipeHandle pid fp args "pipeBoth", fromh, toh)
 #endif
 #endif
 
@@ -298,12 +296,11 @@ The same note about checking the return status applies here as with 'pipeFrom'.
 
 Not available on Windows. -}
 pipeBoth :: FilePath -> [String] -> String -> IO (PipeHandle, String)
-pipeBoth fp args message =
-    do (pid, fromh, toh) <- hPipeBoth fp args
-       _ <- forkIO $ finally (hPutStr toh message)
-                        (hClose toh)
-       c <- hGetContents fromh
-       return (pid, c)
+pipeBoth fp args message = do
+  (pid, fromh, toh) <- hPipeBoth fp args
+  _ <- forkIO $ finally (hPutStr toh message) (hClose toh)
+  c <- hGetContents fromh
+  return (pid, c)
 #endif
 #endif
 
@@ -317,21 +314,19 @@ This call will block waiting for the given pid to terminate.
 Not available on Windows. -}
 forceSuccess :: PipeHandle -> IO ()
 forceSuccess (PipeHandle pid fp args funcname) =
-    let warnfail = warnFail funcname
-        in do status <- getProcessStatus True False pid
-              case status of
-                Nothing -> warnfail fp args $ "Got no process status"
-                Just (Exited (ExitSuccess)) -> return ()
-                Just (Exited (ExitFailure fc)) ->
-                    cmdfailed funcname fp args fc
+  let warnfail = warnFail funcname
+   in do
+      getProcessStatus True False pid >>= \case
+        Nothing -> warnfail fp args "Got no process status"
+        Just (Exited ExitSuccess) -> return ()
+        Just (Exited (ExitFailure fc)) -> cmdfailed funcname fp args fc
 #if MIN_VERSION_unix(2,7,0)
-                Just (Terminated sig _) ->
+        Just (Terminated sig _) ->
 #else
-                Just (Terminated sig) ->
+        Just (Terminated sig) ->
 #endif
-                    warnfail fp args $ "Terminated by signal " ++ show sig
-                Just (Stopped sig) ->
-                    warnfail fp args $ "Stopped by signal " ++ show sig
+          warnfail fp args $ "Terminated by signal " ++ show sig
+        Just (Stopped sig) -> warnfail fp args $ "Stopped by signal " ++ show sig
 #endif
 
 {- | Invokes the specified command in a subprocess, waiting for the result.
@@ -341,25 +336,22 @@ raises a userError with the problem.
 Implemented in terms of 'posixRawSystem' where supported, and System.Posix.rawSystem otherwise.
 -}
 safeSystem :: FilePath -> [String] -> IO ()
-safeSystem command args =
-    do debugM (logbase ++ ".safeSystem")
-               ("Running: " ++ command ++ " " ++ (show args))
+safeSystem command args = do
+  debugM (logbase ++ ".safeSystem") ("Running: " ++ command ++ " " ++ show args)
 #if defined(__HUGS__) || defined(mingw32_HOST_OS) || defined(mingw32_TARGET_OS) || defined(__MINGW32__)
-       ec <- rawSystem command args
-       case ec of
-            ExitSuccess -> return ()
-            ExitFailure fc -> cmdfailed "safeSystem" command args fc
+  rawSystem command args >>= \case
+    ExitSuccess -> return ()
+    ExitFailure fc -> cmdfailed "safeSystem" command args fc
 #else
-       ec <- posixRawSystem command args
-       case ec of
-            Exited ExitSuccess -> return ()
-            Exited (ExitFailure fc) -> cmdfailed "safeSystem" command args fc
+  posixRawSystem command args >>= \case
+    Exited ExitSuccess -> return ()
+    Exited (ExitFailure fc) -> cmdfailed "safeSystem" command args fc
 #if MIN_VERSION_unix(2,7,0)
-            Terminated s _ -> cmdsignalled "safeSystem" command args s
+    Terminated s _ -> cmdsignalled "safeSystem" command args s
 #else
-            Terminated s -> cmdsignalled "safeSystem" command args s
+    Terminated s -> cmdsignalled "safeSystem" command args s
 #endif
-            Stopped s -> cmdsignalled "safeSystem" command args s
+    Stopped s -> cmdsignalled "safeSystem" command args s
 #endif
 
 #if !(defined(mingw32_HOST_OS) || defined(mingw32_TARGET_OS) || defined(__MINGW32__))
@@ -373,33 +365,33 @@ during its execution.
 
 Logs as System.Cmd.Utils.posixRawSystem -}
 posixRawSystem :: FilePath -> [String] -> IO ProcessStatus
-posixRawSystem program args =
-    do debugM (logbase ++ ".posixRawSystem")
-               ("Running: " ++ program ++ " " ++ (show args))
-       oldint <- installHandler sigINT Ignore Nothing
-       oldquit <- installHandler sigQUIT Ignore Nothing
-       let sigset = addSignal sigCHLD emptySignalSet
-       oldset <- getSignalMask
-       blockSignals sigset
-       childpid <- forkProcess (childaction oldint oldquit oldset)
+posixRawSystem program args = do
+  debugM (logbase ++ ".posixRawSystem") ("Running: " ++ program ++ " " ++ show args)
+  oldint <- installHandler sigINT Ignore Nothing
+  oldquit <- installHandler sigQUIT Ignore Nothing
+  let sigset = addSignal sigCHLD emptySignalSet
+  oldset <- getSignalMask
+  blockSignals sigset
+  childpid <- forkProcess (childaction oldint oldquit oldset)
 
-       mps <- getProcessStatus True False childpid
-       restoresignals oldint oldquit oldset
-       let retval = case mps of
-                      Just x -> x
-                      Nothing -> error "Nothing returned from getProcessStatus"
+  mps <- getProcessStatus True False childpid
+  restoresignals oldint oldquit oldset
+  let retval = case mps of
+                Just x -> x
+                Nothing -> error "Nothing returned from getProcessStatus"
 
-       debugM (logbase ++ ".posixRawSystem")
-              (program ++ ": exited with " ++ show retval)
-       return retval
+  debugM (logbase ++ ".posixRawSystem") (program ++ ": exited with " ++ show retval)
+  return retval
 
-    where childaction oldint oldquit oldset =
-              do restoresignals oldint oldquit oldset
-                 executeFile program True args Nothing
-          restoresignals oldint oldquit oldset =
-              do _ <- installHandler sigINT oldint Nothing
-                 _ <- installHandler sigQUIT oldquit Nothing
-                 setSignalMask oldset
+  where
+    childaction oldint oldquit oldset = do
+      restoresignals oldint oldquit oldset
+      executeFile program True args Nothing
+    
+    restoresignals oldint oldquit oldset = do
+      _ <- installHandler sigINT oldint Nothing
+      _ <- installHandler sigQUIT oldquit Nothing
+      setSignalMask oldset
 
 #endif
 #endif
@@ -415,33 +407,30 @@ This function does nothing with signals.  That too is up to you.
 
 Logs as System.Cmd.Utils.forkRawSystem -}
 forkRawSystem :: FilePath -> [String] -> IO ProcessID
-forkRawSystem program args =
-    do debugM (logbase ++ ".forkRawSystem")
-               ("Running: " ++ program ++ " " ++ (show args))
-       forkProcess childaction
-    where
-      childaction = executeFile program True args Nothing
+forkRawSystem program args = do
+  debugM (logbase ++ ".forkRawSystem") ("Running: " ++ program ++ " " ++ show args)
+  forkProcess childaction
+  where
+    childaction = executeFile program True args Nothing
 
 #endif
 #endif
 
 cmdfailed :: String -> FilePath -> [String] -> Int -> IO a
 cmdfailed funcname command args failcode = do
-    let errormsg = "Command " ++ command ++ " " ++ (show args) ++
-            " failed; exit code " ++ (show failcode)
-    let e = userError (errormsg)
-    warningM (logbase ++ "." ++ funcname) errormsg
-    ioError e
+  let errormsg = "Command " ++ command ++ " " ++ show args ++ " failed; exit code " ++ show failcode
+  let e = userError errormsg
+  warningM (logbase ++ "." ++ funcname) errormsg
+  ioError e
 
 #if !(defined(mingw32_HOST_OS) || defined(mingw32_TARGET_OS) || defined(__MINGW32__))
 #ifndef __HUGS__
 cmdsignalled :: String -> FilePath -> [String] -> Signal -> IO a
 cmdsignalled funcname command args failcode = do
-    let errormsg = "Command " ++ command ++ " " ++ (show args) ++
-            " failed due to signal " ++ (show failcode)
-    let e = userError (errormsg)
-    warningM (logbase ++ "." ++ funcname) errormsg
-    ioError e
+  let errormsg = "Command " ++ command ++ " " ++ show args ++ " failed due to signal " ++ show failcode
+  let e = userError errormsg
+  warningM (logbase ++ "." ++ funcname) errormsg
+  ioError e
 #endif
 #endif
 
@@ -456,32 +445,29 @@ sets up a pipe from stdin, and 'WriteToPipe' sets up a pipe from stdout.
 
 Not available on Windows.
  -}
-pOpen :: PipeMode -> FilePath -> [String] ->
-         (Handle -> IO a) -> IO a
-pOpen pm fp args func =
-        do
-        pipepair <- createPipe
-        debugM (logbase ++ ".pOpen")
-               ("Running: " ++ fp ++ " " ++ (show args))
-        case pm of
-         ReadFromPipe -> do
-                         let callfunc _ = do
-                                        closeFd (snd pipepair)
-                                        h <- fdToHandle (fst pipepair)
-                                        x <- func h
-                                        hClose h
-                                        return $! x
-                         pOpen3 Nothing (Just (snd pipepair)) Nothing fp args
-                                callfunc (closeFd (fst pipepair))
-         WriteToPipe -> do
-                        let callfunc _ = do
-                                       closeFd (fst pipepair)
-                                       h <- fdToHandle (snd pipepair)
-                                       x <- func h
-                                       hClose h
-                                       return $! x
-                        pOpen3 (Just (fst pipepair)) Nothing Nothing fp args
-                               callfunc (closeFd (snd pipepair))
+pOpen :: PipeMode -> FilePath -> [String] -> (Handle -> IO a) -> IO a
+pOpen pm fp args func = do
+  pipepair <- createPipe
+  debugM (logbase ++ ".pOpen") ("Running: " ++ fp ++ " " ++ show args)
+  case pm of
+    ReadFromPipe -> do
+      let callfunc _ = do
+            closeFd (snd pipepair)
+            h <- fdToHandle (fst pipepair)
+            x <- func h
+            hClose h
+            return $! x
+      pOpen3 Nothing (Just (snd pipepair)) Nothing fp args
+              callfunc (closeFd (fst pipepair))
+    WriteToPipe -> do
+      let callfunc _ = do
+            closeFd (fst pipepair)
+            h <- fdToHandle (snd pipepair)
+            x <- func h
+            hClose h
+            return $! x
+      pOpen3 (Just (fst pipepair)) Nothing Nothing fp args
+              callfunc (closeFd (snd pipepair))
 #endif
 #endif
 
@@ -502,12 +488,12 @@ pOpen3 :: Maybe Fd                      -- ^ Send stdin to this fd
        -> (ProcessID -> IO a)           -- ^ Action to run in parent
        -> IO ()                         -- ^ Action to run in child before execing (if you don't need something, set this to @return ()@) -- IGNORED IN HUGS
        -> IO a
-pOpen3 pin pout perr fp args func childfunc =
-    do pid <- pOpen3Raw pin pout perr fp args childfunc
-       retval <- func $! pid
-       let rv = seq retval retval
-       forceSuccess (PipeHandle (seq retval pid) fp args "pOpen3")
-       return rv
+pOpen3 pin pout perr fp args func childfunc = do
+  pid <- pOpen3Raw pin pout perr fp args childfunc
+  retval <- func $! pid
+  let rv = seq retval retval
+  forceSuccess (PipeHandle (seq retval pid) fp args "pOpen3")
+  return rv
 #endif
 #endif
 
@@ -531,34 +517,22 @@ pOpen3Raw :: Maybe Fd                      -- ^ Send stdin to this fd
        -> IO ()                         -- ^ Action to run in child before execing (if you don't need something, set this to @return ()@) -- IGNORED IN HUGS
        -> IO ProcessID
 pOpen3Raw pin pout perr fp args childfunc =
-    let mayberedir Nothing _ = return ()
-        mayberedir (Just fromfd) tofd = do
-                                        _ <- dupTo fromfd tofd
-                                        closeFd fromfd
-                                        return ()
-        childstuff = do
-                     mayberedir pin stdInput
-                     mayberedir pout stdOutput
-                     mayberedir perr stdError
-                     childfunc
-                     debugM (logbase ++ ".pOpen3")
-                            ("Running: " ++ fp ++ " " ++ (show args))
-                     executeFile fp True args Nothing
-{-
-        realfunc p = do
-                     System.Posix.Signals.installHandler
-                           System.Posix.Signals.sigPIPE
-                           System.Posix.Signals.Ignore
-                           Nothing
-                     func p
--}
-        in
-        do
-        p <- Control.Exception.try (forkProcess childstuff)
-        pid <- case p of
-                Right x -> return x
-                Left (e :: Control.Exception.IOException) -> fail ("Error in fork: " ++ (show e))
-        return pid
+  let mayberedir Nothing _ = return ()
+      mayberedir (Just fromfd) tofd = do
+        _ <- dupTo fromfd tofd
+        closeFd fromfd
+        return ()
+      childstuff = do
+        mayberedir pin stdInput
+        mayberedir pout stdOutput
+        mayberedir perr stdError
+        childfunc
+        debugM (logbase ++ ".pOpen3") ("Running: " ++ fp ++ " " ++ show args)
+        executeFile fp True args Nothing
+  in
+    try (forkProcess childstuff) >>= \case
+      Right x -> return x
+      Left (e :: IOException) -> fail ("Error in fork: " ++ show e)
 
 #endif
 #endif
