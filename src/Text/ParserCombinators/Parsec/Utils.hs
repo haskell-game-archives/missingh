@@ -1,4 +1,5 @@
 {-# LANGUAGE Safe #-}
+{-# LANGUAGE LambdaCase #-}
 
 {- arch-tag: Parsec utilities
 Copyright (c) 2004-2011 John Goerzen <jgoerzen@complete.org>
@@ -94,16 +95,9 @@ listg l = tokens (show . map fst) nextpos l
 -- the given error message.  It will not consume input in either case.
 notMatching :: GenParser a b c -> String -> GenParser a b ()
 notMatching p errormsg =
-  let maybeRead =
-        try
-          ( do
-              x <- p
-              return (Just x)
-          )
-          <|> return Nothing
+  let maybeRead = try (Just <$> p) <|> return Nothing
       workerFunc = do
-        x <- maybeRead
-        case x of
+        maybeRead >>= \case
           Nothing -> return ()
           Just _ -> unexpected errormsg
    in try workerFunc
