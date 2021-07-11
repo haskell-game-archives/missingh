@@ -8,24 +8,23 @@ For license and copyright information, see the file LICENSE
 
 module HVFStest (tests) where
 
-import Control.Exception
 import System.FilePath (pathSeparator)
 import System.IO
-import System.IO.Error
 import System.IO.HVFS
 import System.IO.HVFS.Combinators
 import System.IO.HVFS.InstanceHelpers
 import System.IO.HVIO
 import Test.HUnit
-import TestUtils
 
+sep :: String -> String
 sep = map (\c -> if c == '/' then pathSeparator else c)
 
 ioeq :: (Show a, Eq a) => a -> IO a -> Assertion
-ioeq exp inp = do
+ioeq exp' inp = do
   x <- inp
-  exp @=? x
+  exp' @=? x
 
+testTree :: [(String, MemoryEntry)]
 testTree =
   [ ("test.txt", MemoryFile "line1\nline2\n"),
     ("file2.txt", MemoryFile "line3\nline4\n"),
@@ -39,8 +38,9 @@ testTree =
     )
   ]
 
+test_nice_slice :: [Test]
 test_nice_slice =
-  let f exp fp' = TestLabel fp $ TestCase $ exp @=? nice_slice fp
+  let f exp' fp' = TestLabel fp $ TestCase $ exp' @=? nice_slice fp
         where
           fp = sep fp'
    in [ f [] "/",
@@ -48,14 +48,15 @@ test_nice_slice =
         --,f [] "."
       ]
 
+test_content :: [Test]
 test_content =
-  let f exp fp' = TestLabel fp $
+  let f exp' fp' = TestLabel fp $
         TestCase $
           do
             x <- newMemoryVFS testTree
             h <- vOpen x fp ReadMode
             case h of
-              HVFSOpenEncap h2 -> exp `ioeq` vGetContents h2
+              HVFSOpenEncap h2 -> exp' `ioeq` vGetContents h2
         where
           fp = sep fp'
    in [ f "line1\nline2\n" "test.txt",
@@ -64,6 +65,7 @@ test_content =
         f "subdir test" "/dir1/test.txt"
       ]
 
+test_chroot :: [Test]
 test_chroot =
   let f msg testfunc = TestLabel msg $
         TestCase $
@@ -104,6 +106,7 @@ test_chroot =
           --               (vOpen x "/test.txt" ReadMode >>= vGetContents))
       ]
 
+test_structure :: [Test]
 test_structure =
   let f msg testfunc = TestLabel msg $
         TestCase $ do
@@ -146,6 +149,7 @@ test_structure =
           )
       ]
 
+tests :: Test
 tests =
   TestList
     [ TestLabel "nice_slice" (TestList test_nice_slice),

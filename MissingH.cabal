@@ -128,8 +128,6 @@ library
 
   default-extensions:
     OverlappingInstances
-    Rank2Types
-    ScopedTypeVariables
     UndecidableInstances
 
   other-extensions:

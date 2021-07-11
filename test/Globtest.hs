@@ -9,27 +9,29 @@ For license and copyright information, see the file LICENSE
 
 -}
 
-
 module Globtest(tests) where
 import Test.HUnit
 import System.Path.Glob
 import System.Path
-import TestUtils
 import System.IO.HVFS
 import System.Directory(createDirectory)
 #if !(defined(mingw32_HOST_OS) || defined(mingw32_TARGET_OS) || defined(__MINGW32__))
-import System.Posix.Directory hiding (createDirectory)
 import System.Posix.Files
 #endif
 import Control.Exception
 import Data.List
 import System.FilePath (pathSeparator)
 
+sep :: String -> String
 sep = map (\c -> if c == '/' then pathSeparator else c)
 
+bp :: String
 bp = "testtmp"
+
+touch :: String -> IO ()
 touch x = writeFile (sep x) ""
 
+globtest :: IO a -> IO a
 globtest thetest = 
     bracket_ (setupfs)
              (recursiveRemove SystemFS bp)
@@ -47,13 +49,17 @@ globtest thetest =
                  createSymbolicLink (preppath "broken") (preppath "sym1")
                  createSymbolicLink (preppath "broken") (preppath "sym2")
 #endif
-                 
-eq msg exp res =
-    assertEqual msg (sort exp) (sort res)
-mf msg func = TestLabel msg $ TestCase $ globtest func
+
+eq :: (Show a, Ord a) => String -> [a] -> [a] -> Assertion
+eq msg exp' res = assertEqual msg (sort exp') (sort res)
+
+f :: IO () -> Test
 f func = TestCase $ globtest func
+
+preppath :: String -> String
 preppath x = sep (bp ++ "/" ++ x)
 
+test_literal :: [Test]
 test_literal =
     map f
             [glob (preppath "a") >>= eq "" [preppath "a"]
@@ -62,6 +68,7 @@ test_literal =
             ,glob (preppath "nonexistant") >>= eq "empty" []
             ]
 
+test_one_dir :: [Test]
 test_one_dir =
     map f
         [glob (preppath "a*") >>= eq "a*" (map preppath ["a", "aab", "aaa"]),
@@ -71,6 +78,7 @@ test_one_dir =
          glob (preppath "*q") >>= eq "*q" []
         ]
 
+test_nested_dir :: [Test]
 test_nested_dir =
     map f
         [glob (preppath "a/bcd/E*") >>= eq "a/bcd/E*" [preppath "a/bcd/EF"],
@@ -78,6 +86,7 @@ test_nested_dir =
          glob (preppath "a/*.foo") >>= eq "a/*.foo" [preppath "a/a.foo"]
         ]
 
+test_dirnames :: [Test]
 test_dirnames = 
     map f
         [glob (preppath "*/D") >>= eq "*/D" [preppath "a/D"],
@@ -86,6 +95,7 @@ test_dirnames =
          glob (preppath "?a?/*F") >>= eq "?a?/*F" (map preppath ["aaa/zzzF", "aab/F"])
         ]
 
+test_brokensymlinks :: [Test]
 test_brokensymlinks =
 #if !(defined(mingw32_HOST_OS) || defined(mingw32_TARGET_OS) || defined(__MINGW32__))
     map f
@@ -96,14 +106,10 @@ test_brokensymlinks =
 #else
     []
 #endif
-         
 
+tests :: Test
 tests = TestList [TestLabel "test_literal" (TestList test_literal),
                   TestLabel "test_one_dir" (TestList test_one_dir),
                   TestLabel "test_nested_dir" (TestList test_nested_dir),
                   TestLabel "test_dirnames" (TestList test_dirnames),
                   TestLabel "test_brokensymlinks" (TestList test_brokensymlinks)]
-
-
-
-

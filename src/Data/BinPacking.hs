@@ -1,4 +1,5 @@
 {-# LANGUAGE Safe #-}
+{-# LANGUAGE Rank2Types #-}
 {-
 Copyright (c) 2008-2011 John Goerzen <jgoerzen@complete.org>
 
