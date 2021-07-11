@@ -119,6 +119,7 @@ utcTimeToSeconds = fromInteger . floor . utcTimeToPOSIXSeconds
 
 ----------- stat
 type FileStatus = FileStatusCompat
+
 getFileStatus :: FilePath -> IO FileStatus
 getFileStatus fp =
     do isfile <- doesFileExist fp

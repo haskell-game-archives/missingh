@@ -37,13 +37,13 @@ import Data.Word
 -- Example:
 --
 -- > getBytes (0x12345678::Int) -> [0x12, 0x34, 0x56, 0x78]
-getBytes :: (Integral a, Bounded a, Bits a) => a -> [a]
+getBytes :: (Integral a, Bounded a, FiniteBits a) => a -> [a]
 getBytes input =
   let getByte _ 0 = []
       getByte x remaining = (x .&. 0xff) : getByte (shiftR x 8) (remaining - 1)
-   in if (bitSize input `mod` 8) /= 0
+   in if (finiteBitSize input `mod` 8) /= 0
         then error "Input data bit size must be a multiple of 8"
-        else reverse $ getByte input (bitSize input `div` 8)
+        else reverse $ getByte input (finiteBitSize input `div` 8)
 
 -- | The opposite of 'getBytes', this function builds a number based on
 -- its component bytes.

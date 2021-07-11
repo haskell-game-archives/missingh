@@ -61,7 +61,6 @@ import System.Time.Utils
 import System.IO
 import System.IO.Error
 import System.IO.PlafCompat
-import System.Posix.Types
 import System.Time
 import qualified System.Directory as D
 
@@ -117,46 +116,46 @@ reasonable values.
 A default implementation of this is not currently present on Windows.
 -}
 
-class (Show a) => HVFSStat a where
-    vDeviceID :: a -> DeviceID
-    vFileID :: a -> FileID
+class HVFSStat a where
+  vDeviceID :: a -> DeviceID
+  vFileID :: a -> FileID
 
-    {- | Refers to file permissions, NOT the st_mode field from stat(2) -}
-    vFileMode :: a -> FileMode
+  {- | Refers to file permissions, NOT the st_mode field from stat(2) -}
+  vFileMode :: a -> FileMode
 
-    vLinkCount :: a -> LinkCount
-    vFileOwner :: a -> UserID
-    vFileGroup :: a -> GroupID
+  vLinkCount :: a -> LinkCount
+  vFileOwner :: a -> UserID
+  vFileGroup :: a -> GroupID
 
-    vSpecialDeviceID :: a -> DeviceID
-    vFileSize :: a -> FileOffset
-    vAccessTime :: a -> EpochTime
-    vModificationTime :: a -> EpochTime
-    vStatusChangeTime :: a -> EpochTime
-    vIsBlockDevice :: a -> Bool
-    vIsCharacterDevice :: a -> Bool
-    vIsNamedPipe :: a -> Bool
-    vIsRegularFile :: a -> Bool
-    vIsDirectory :: a -> Bool
-    vIsSymbolicLink :: a -> Bool
-    vIsSocket :: a -> Bool
+  vSpecialDeviceID :: a -> DeviceID
+  vFileSize :: a -> FileOffset
+  vAccessTime :: a -> EpochTime
+  vModificationTime :: a -> EpochTime
+  vStatusChangeTime :: a -> EpochTime
+  vIsBlockDevice :: a -> Bool
+  vIsCharacterDevice :: a -> Bool
+  vIsNamedPipe :: a -> Bool
+  vIsRegularFile :: a -> Bool
+  vIsDirectory :: a -> Bool
+  vIsSymbolicLink :: a -> Bool
+  vIsSocket :: a -> Bool
 
-    vDeviceID _ = 0
-    vFileID _ = 0
-    vFileMode x = if vIsDirectory x then 0x755 else 0o0644
-    vLinkCount _ = 1
-    vFileOwner _ = 0
-    vFileGroup _ = 0
-    vSpecialDeviceID _ = 0
-    vFileSize _ = 0
-    vAccessTime _ = 0
-    vModificationTime _ = 0
-    vStatusChangeTime _ = 0
-    vIsBlockDevice _ = False
-    vIsCharacterDevice _ = False
-    vIsNamedPipe _ = False
-    vIsSymbolicLink _ = False
-    vIsSocket _ = False
+  vDeviceID _ = 0
+  vFileID _ = 0
+  vFileMode x = if vIsDirectory x then 0x755 else 0o0644
+  vLinkCount _ = 1
+  vFileOwner _ = 0
+  vFileGroup _ = 0
+  vSpecialDeviceID _ = 0
+  vFileSize _ = 0
+  vAccessTime _ = 0
+  vModificationTime _ = 0
+  vStatusChangeTime _ = 0
+  vIsBlockDevice _ = False
+  vIsCharacterDevice _ = False
+  vIsNamedPipe _ = False
+  vIsSymbolicLink _ = False
+  vIsSocket _ = False
 
 {- | The main HVFS class.
 
@@ -225,7 +224,7 @@ class (Show a) => HVFS a where
                                     return $ withStat s vIsDirectory
               ) (\(_ :: Control.Exception.IOException) -> return False)
     vDoesExist fs fp =
-        Control.Exception.catch (do s <- vGetSymbolicLinkStatus fs fp
+        Control.Exception.catch (do _ <- vGetSymbolicLinkStatus fs fp
                                     return True
               ) (\(_ :: Control.Exception.IOException) -> return False)
     vCreateDirectory fs _ = eh fs "vCreateDirectory"
@@ -263,9 +262,6 @@ class HVFS a => HVFSOpenable a where
 
     -- | Open a file in binary mode.
     vOpenBinaryFile = vOpen
-
-instance Show FileStatus where
-    show _ = "<FileStatus>"
 
 ----------------------------------------------------------------------
 -- Standard implementations

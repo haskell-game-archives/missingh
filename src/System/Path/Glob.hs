@@ -23,15 +23,13 @@ in "System.Path.WildMatch".
 
 -}
 
-module System.Path.Glob (glob, vGlob)
-    where
-import           Control.Exception     (tryJust)
-import           Data.List             (isSuffixOf)
-import           Data.List.Utils       (hasAny)
-import           System.FilePath       (isPathSeparator, pathSeparator,
-                                        splitFileName, (</>))
+module System.Path.Glob (glob, vGlob) where
+import           Control.Exception
+import           Data.List
+import           Data.List.Utils
+import           System.FilePath
 import           System.IO.HVFS
-import           System.Path.WildMatch (wildCheckCase)
+import           System.Path.WildMatch
 
 hasWild :: String -> Bool
 hasWild = hasAny "*?["

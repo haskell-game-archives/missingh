@@ -38,8 +38,7 @@ module System.FileArchive.GZip (
                                  )
     where
 
-import Control.Monad.Error
-import Control.Monad.Trans.Except
+import Control.Monad.Except
 import           Data.Bits                ((.&.))
 import           Data.Bits.Utils          (fromBytes)
 import           Data.Char                (ord)

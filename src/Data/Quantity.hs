@@ -1,4 +1,5 @@
 {-# LANGUAGE Safe #-}
+{-# LANGUAGE TypeApplications #-}
 
 {-
 Copyright (c) 2006-2011 John Goerzen <jgoerzen@complete.org>
@@ -85,11 +86,11 @@ quantifyNums _ [] = error "Attempt to use quantifyNums on an empty list"
 quantifyNums opts (headnum : xs) =
   (map (\n -> procnum n) (headnum : xs), suffix)
   where
-    number = case fromRational . toRational $ headnum of
+    number = case fromRational @Double . toRational $ headnum of
       0 -> 1
       x -> x
     incrList = map idx2pwr [0 .. length (suffixes opts) - 1]
-    incrIdxList = zip incrList [0 ..]
+    incrIdxList = zip incrList ([0 ..] :: [Int])
     idx2pwr i = i * powerIncr opts + firstPower opts
     finderfunc (x, _) =
       (fromIntegral $ base opts) ** (fromIntegral x)
@@ -217,7 +218,7 @@ parseNum opts insensitive inp =
       | otherwise = x
     multiplier :: (Read a, Fractional a) => Int -> a
     multiplier power =
-      fromRational . toRational $
+      fromRational . toRational @Double $
         fromIntegral (base opts) ** fromIntegral power
 
 -- | Parse a number as with 'parseNum', but return the result as

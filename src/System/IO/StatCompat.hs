@@ -28,7 +28,6 @@ import           System.Posix.Types
 #if !(defined(mingw32_HOST_OS) || defined(mingw32_TARGET_OS) || defined(__MINGW32__))
 import           System.Posix.Files  (intersectFileModes)
 #endif
-import           Data.Bits           ((.&.))
 
 #if (defined(mingw32_HOST_OS) || defined(mingw32_TARGET_OS) || defined(__MINGW32__))
 type LinkCount = Int

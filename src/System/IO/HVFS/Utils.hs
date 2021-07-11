@@ -85,9 +85,9 @@ child files\/directories.
 recursiveRemove :: HVFS a => a -> FilePath -> IO ()
 recursiveRemove h fn =
     recurseDirStat h fn >>= (mapM_ $
-        \(fn, fs) -> if withStat fs vIsDirectory
-                         then vRemoveDirectory h fn
-                         else vRemoveFile h fn
+        \(fn', fs) -> if withStat fs vIsDirectory
+                         then vRemoveDirectory h fn'
+                         else vRemoveFile h fn'
                               )
 
 {- | Provide a result similar to the command ls -l over a directory.
@@ -110,7 +110,7 @@ lsl fs fp =
                 (if i otherReadMode then 'r' else '-') :
                 (if i otherWriteMode then 'w' else '-') :
                 (if i otherExecuteMode then 'x' else '-') : []
-        showentry origdir fh (state, fp) =
+        showentry origdir fh (state, fp') =
             case state of
               HVFSStatEncap se ->
                let typechar =
@@ -128,7 +128,7 @@ lsl fs fp =
                           linkstr <- case vIsSymbolicLink se of
                                        False -> return ""
                                        True -> do sl <- vReadSymbolicLink fh
-                                                           (origdir </> fp)
+                                                           (origdir </> fp')
                                                   return $ " -> " ++ sl
                           return $ printf "%c%s  1 %-8d %-8d %-9d %s %s%s"
                                      typechar
@@ -137,7 +137,7 @@ lsl fs fp =
                                      (toInteger $ vFileGroup se)
                                      (toInteger $ vFileSize se)
                                      (datestr c)
-                                     fp
+                                     fp'
                                      linkstr
         in do c <- vGetDirectoryContents fs fp
               pairs <- mapM (\x -> do ss <- vGetSymbolicLinkStatus fs (fp </> x)

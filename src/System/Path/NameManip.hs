@@ -45,15 +45,14 @@ slice_path (c:cs) = if isPathSeparator c
                            (p:ps) -> (c:p):ps
                        else slice_path' (c:cs)
     where
-      slice_path' o = filter (\c -> c /= "" && c /= ".") (split o)
+      slice_path' o = filter (\c' -> c' /= "" && c' /= ".") (split o)
 
       split xs = unfoldr f xs
         where
           f "" = Nothing
-          f xs = Just $ fmap tail' $ break isPathSeparator xs
+          f xs' = Just $ fmap tail' $ break isPathSeparator xs'
           tail' [] = []
-          tail' xs = tail xs
-
+          tail' xs' = tail xs'
 
 {- | Form a path from path components. This isn't the inverse
 of 'slice_path', since @'unslice_path' . 'slice_path'@
@@ -129,7 +128,7 @@ slice_filename' filename =
      ('.':filename') -> case slice_filename'' filename' of
                            []     -> ["."]
                            (t:ts) -> ('.':t) : ts
-     filename -> slice_filename'' filename
+     filename' -> slice_filename'' filename'
    where
       slice_filename'' :: String -> [String]
       slice_filename'' "" = []

@@ -78,21 +78,8 @@ module Data.List.Utils
   )
 where
 
-import Control.Monad.State (State, get, put)
+import Control.Monad.State hiding (join)
 import Data.List
-  ( concat,
-    elemIndex,
-    elemIndices,
-    find,
-    findIndex,
-    intersperse,
-    isInfixOf,
-    isPrefixOf,
-    isSuffixOf,
-    nub,
-    tails,
-  )
-import Data.Maybe (isJust)
 
 -- | Merge two sorted lists into a single, sorted whole.
 --
@@ -118,8 +105,8 @@ merge = mergeBy (compare)
 --          where types = xs :: [ (Int, Int) ]
 --                cmp (x1,_) (x2,_) = compare x1 x2
 mergeBy :: (a -> a -> Ordering) -> [a] -> [a] -> [a]
-mergeBy cmp [] ys = ys
-mergeBy cmp xs [] = xs
+mergeBy _ [] ys = ys
+mergeBy _ xs [] = xs
 mergeBy cmp (allx@(x : xs)) (ally@(y : ys))
   -- Ordering derives Eq, Ord, so the comparison below is valid.
   -- Explanation left as an exercise for the reader.
@@ -172,7 +159,7 @@ takeWhileList func list@(x : xs) =
 -- The function is given the remainder of the list to examine.
 dropWhileList :: ([a] -> Bool) -> [a] -> [a]
 dropWhileList _ [] = []
-dropWhileList func list@(x : xs) =
+dropWhileList func list@(_:xs) =
   if func list
     then dropWhileList func xs
     else list
@@ -361,7 +348,7 @@ alwaysElemRIndex item list =
 -- | Forces the evaluation of the entire list.
 seqList :: [a] -> [a]
 seqList [] = []
-seqList list@(x : xs) = seq (seqList xs) list
+seqList list@(_:xs) = seq (seqList xs) list
 
 --------------------------------------------------
 -- Advanced Conversions
@@ -430,10 +417,10 @@ fixedWidth len =
     -- Empty length: Stop here.
     fixedWidthFunc [] x = ((fixedWidth []), [], [x])
     -- Stuff to process: Do it.
-    fixedWidthFunc (len : lenxs) input =
+    fixedWidthFunc (len' : lenxs) input =
       (fixedWidth lenxs, next, [this])
       where
-        (this, next) = splitAt len input
+        (this, next) = splitAt len' input
 
 -- | Helps you pick out fixed-width components from a list.
 --

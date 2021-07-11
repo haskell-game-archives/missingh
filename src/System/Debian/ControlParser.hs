@@ -32,35 +32,41 @@ eol, extline :: GenParser Char st String
 eol = (try (string "\r\n"))
       <|> string "\n" <?> "EOL"
 
-extline = try (do char ' '
-                  content <- many (noneOf "\r\n")
-                  eol
-                  return content )
+extline = try $ do
+  _ <- char ' '
+  content <- many (noneOf "\r\n")
+  _ <- eol
+  return content
 
 entry :: GenParser Char st (String, String)
-entry = do key <- many1 (noneOf ":\r\n")
-           char ':'
-           val <- many (noneOf "\r\n")
-           eol
-           exts <- many extline
-           return (key, unlines ([val] ++ exts))
+entry = do
+  key <- many1 (noneOf ":\r\n")
+  _ <- char ':'
+  val <- many (noneOf "\r\n")
+  _ <- eol
+  exts <- many extline
+  return (key, unlines ([val] ++ exts))
 
 {- | Main parser for the control file -}
 control :: CharParser a [(String, String)]
-control = do many header
-             retval <- many entry
-             return retval
+control = do
+  _ <- many header
+  retval <- many entry
+  return retval
 
 headerPGP, blankLine, header, headerHash :: GenParser Char st ()
-headerPGP = do string "-----BEGIN PGP"
-               manyTill (noneOf "\r\n") eol
-               return ()
-blankLine = do many (oneOf " \t")
-               eol
-               return ()
-headerHash = do string "Hash: "
-                manyTill (noneOf "\r\n") eol
-                return ()
+headerPGP = do
+  _ <- string "-----BEGIN PGP"
+  _ <- manyTill (noneOf "\r\n") eol
+  return ()
+blankLine = do
+  _ <- many (oneOf " \t")
+  _ <- eol
+  return ()
+headerHash = do
+  _ <- string "Hash: "
+  _ <- manyTill (noneOf "\r\n") eol
+  return ()
 header = (try headerPGP) <|> (try blankLine) <|> (try headerHash)
 
 {- | Dependency parser.
@@ -70,20 +76,20 @@ Returns (package name, Maybe version, arch list)
 version is (operator, operand) -}
 depPart :: CharParser a (String, (Maybe (String, String)), [String])
 depPart = do packagename <- many1 (noneOf " (")
-             many (char ' ')
-             version <- (do char '('
+             _ <- many (char ' ')
+             version <- (do _ <- char '('
                             op <- many1 (oneOf "<>=")
-                            many (char ' ')
+                            _ <- many (char ' ')
                             vers <- many1 (noneOf ") ")
-                            many (char ' ')
-                            char ')'
+                            _ <- many (char ' ')
+                            _ <- char ')'
                             return $ Just (op, vers)
                         ) <|> return Nothing
-             many (char ' ')
-             archs <- (do char '['
+             _ <- many (char ' ')
+             archs <- (do _ <- char '['
                           t <- many1 (noneOf "]")
-                          many (char ' ')
-                          char ']'
+                          _ <- many (char ' ')
+                          _ <- char ']'
                           return (split " " t)
                       ) <|> return []
              return (packagename, version, archs)

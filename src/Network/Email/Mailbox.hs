@@ -70,7 +70,7 @@ class (Show a, Show b, Eq b) => MailboxReader a b where
                            map (\(i, f, _) -> (i, f))
     getMessages mb list =
         do messages <- getAll mb
-           return $ filter (\(id, f, m) -> id `elem` list) messages
+           return $ filter (\(id', _f, _m) -> id' `elem` list) messages
     
 class (MailboxReader a b) => MailboxWriter a b where
     appendMessages :: a -> [(Flags, Message)] -> IO [b]

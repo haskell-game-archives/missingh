@@ -35,7 +35,6 @@ import qualified System.Posix.Signals
 import Control.Exception (bracketOnError)
 import Network.BSD
 import Network.Socket
-import System.IO
 
 -- | Sets up the system for networking.  Similar to the built-in
 -- withSocketsDo (and actually, calls it), but also sets the SIGPIPE
@@ -51,7 +50,7 @@ niceSocketsDo :: IO a -> IO a
 niceSocketsDo func = do
 #if !(defined(mingw32_HOST_OS) || defined(mingw32_TARGET_OS) || defined(__MINGW32__))
                 -- No signals on Windows anyway
-                System.Posix.Signals.installHandler
+                _ <- System.Posix.Signals.installHandler
                       System.Posix.Signals.sigPIPE
                       System.Posix.Signals.Ignore
                       Nothing
@@ -82,8 +81,8 @@ listenTCPAddr addr queuelen = do
 showSockAddr :: SockAddr -> IO String
 #if !(defined(mingw32_HOST_OS) || defined(mingw32_TARGET_OS) || defined(__MINGW32__))
 showSockAddr (SockAddrUnix x) = return $ "UNIX socket at " ++ x
+showSockAddr (SockAddrInet6 _ _ _ _) = error "SockAddrInet6"
 #endif
-showSockAddr sa@(SockAddrInet port host) =
-  do
-    (Just h, _) <- getNameInfo [NI_NUMERICHOST] True False sa
-    return $ "IPv4 host " ++ h ++ ", port " ++ (show port)
+showSockAddr sa@(SockAddrInet port _host) = do
+  (Just h, _) <- getNameInfo [NI_NUMERICHOST] True False sa
+  return $ "IPv4 host " ++ h ++ ", port " ++ (show port)

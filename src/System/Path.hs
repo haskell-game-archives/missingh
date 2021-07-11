@@ -43,15 +43,13 @@ where
 #if !(defined(mingw32_HOST_OS) || defined(mingw32_TARGET_OS) || defined(__MINGW32__))
 import           System.Directory       hiding (createDirectory)
 import           System.Posix.Directory (createDirectory)
-import           System.Posix.Files
 import           System.Posix.Temp
 #else
 import           System.Directory
 #endif
 import Control.Exception
-import Data.List
 import Data.List.Utils
-import System.FilePath (isPathSeparator, pathSeparator, (</>))
+import System.FilePath
 import System.IO
 import System.IO.HVFS.Utils
 import System.Path.NameManip
@@ -88,8 +86,8 @@ absNormPath ::
   -- | Result
   Maybe String
 absNormPath base thepath =
-  let abs = absolute_path_by base thepath
-   in case guess_dotdot (normalise_path abs) of
+  let abs' = absolute_path_by base thepath
+   in case guess_dotdot (normalise_path abs') of
         Just "." -> Just [pathSeparator]
         x -> x
 

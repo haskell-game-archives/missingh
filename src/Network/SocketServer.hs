@@ -129,12 +129,10 @@ closeSocketServer ss =
 
 -- | Handle one incoming request from the given 'SocketServer'.
 handleOne :: SocketServer -> HandlerT -> IO ()
-handleOne ss func =
-  let opts = (optionsSS ss)
-   in do
-        a <- accept (sockSS ss)
-        localaddr <- getSocketName (fst a)
-        func (fst a) (snd a) localaddr
+handleOne ss func = do
+  a <- accept (sockSS ss)
+  localaddr <- getSocketName (fst a)
+  func (fst a) (snd a) localaddr
 
 -- | Handle all incoming requests from the given 'SocketServer'.
 serveForever :: SocketServer -> HandlerT -> IO ()
@@ -179,7 +177,7 @@ loggingHandler ::
   HandlerT ->
   -- | Resulting handler
   HandlerT
-loggingHandler hname prio nexth socket r_sockaddr l_sockaddr =
+loggingHandler hname prio nexth socket' r_sockaddr l_sockaddr =
   do
     sockStr <- showSockAddr r_sockaddr
     System.Log.Logger.logM
@@ -191,7 +189,7 @@ loggingHandler hname prio nexth socket r_sockaddr l_sockaddr =
       System.Log.Logger.WARNING
       ""
       ( nexth
-          socket
+          socket'
           r_sockaddr
           l_sockaddr
       )
@@ -207,10 +205,9 @@ threadedHandler ::
   HandlerT ->
   -- | Resulting handler
   HandlerT
-threadedHandler nexth socket r_sockaddr l_sockaddr =
-  do
-    forkIO (nexth socket r_sockaddr l_sockaddr)
-    return ()
+threadedHandler nexth socket' r_sockaddr l_sockaddr = do
+  _ <- forkIO (nexth socket' r_sockaddr l_sockaddr)
+  return ()
 
 -- | Give your handler function a Handle instead of a Socket.
 --
@@ -224,9 +221,8 @@ handleHandler ::
   -- | Handler to call
   (Handle -> SockAddr -> SockAddr -> IO ()) ->
   HandlerT
-handleHandler func socket r_sockaddr l_sockaddr =
-  do
-    h <- socketToHandle socket ReadWriteMode
-    hSetBuffering h LineBuffering
-    func h r_sockaddr l_sockaddr
-    hClose h
+handleHandler func socket' r_sockaddr l_sockaddr = do
+  h <- socketToHandle socket' ReadWriteMode
+  hSetBuffering h LineBuffering
+  func h r_sockaddr l_sockaddr
+  hClose h

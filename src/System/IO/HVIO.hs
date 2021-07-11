@@ -121,7 +121,7 @@ module System.IO.HVIO(-- * Implementation Classes
 where
 
 import           Control.Concurrent.MVar
-import qualified Control.Exception       (IOException, catch)
+import Control.Exception
 import           Data.IORef
 import           Foreign.C
 import           Foreign.Ptr
@@ -289,7 +289,7 @@ class (Show a) => HVIO a where
                                      x    -> accum `seq` loop (accum ++ [x])
                     handler e = if isEOFError e then return accum
                                 else ioError e
-                    in Control.Exception.catch func handler
+                    in catch func handler
             in
             do firstchar <- vGetChar h
                case firstchar of
@@ -303,7 +303,7 @@ class (Show a) => HVIO a where
                               c `seq` return (c : next)
                     handler e = if isEOFError e then return []
                                 else ioError e
-                    in Control.Exception.catch func handler
+                    in catch func handler
             in
             do loop
 

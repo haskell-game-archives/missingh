@@ -42,7 +42,6 @@ import Data.Char
 import qualified Data.Map as Map
 import Data.Map.Utils
 import System.IO
-import System.IO.Error
 import System.IO.Utils
 import System.Path
 
@@ -117,8 +116,8 @@ hReadMIMETypes mtd strict h =
                  in foldl (\o suff -> addType o strict thetype ('.' : suff)) obj suffixlist
               else obj
    in do
-        lines <- hGetLines h
-        return (foldl parseline mtd lines)
+        lines' <- hGetLines h
+        return (foldl parseline mtd lines')
 
 -- | Guess the type of a file given a filename or URL.  The file
 --   is not opened; only the name is considered.
