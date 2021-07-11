@@ -26,19 +26,19 @@ import Data.Bits
 import Data.Char
 import Data.Word
 
-update_crc :: Word32 -> Char -> Word32
-update_crc crc ch =
+updateCrc :: Word32 -> Char -> Word32
+updateCrc crc ch =
   let c = crc `xor` 0xFFFFFFFF
       newval =
         (gzipcrctab ! fromIntegral ((c `xor` fromIntegral (ord ch)) .&. 0xff))
           `xor` (c `shiftR` 8)
    in newval `xor` 0xFFFFFFFF
 
-update_crc_list :: Word32 -> [Char] -> Word32
-update_crc_list start list = foldl update_crc start list
+updateCrcList :: Word32 -> [Char] -> Word32
+updateCrcList = foldl updateCrc
 
 calc_crc32 :: [Char] -> Word32
-calc_crc32 s = update_crc_list 0 s
+calc_crc32 = updateCrcList 0
 
 gzipcrctab :: Array Int Word32
 gzipcrctab =
