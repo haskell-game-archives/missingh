@@ -1,5 +1,4 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE Trustworthy #-}
 
 {- arch-tag: Network utilities main file
 Copyright (c) 2004-2011 John Goerzen <jgoerzen@complete.org>
@@ -81,8 +80,8 @@ listenTCPAddr addr queuelen = do
 showSockAddr :: SockAddr -> IO String
 #if !(defined(mingw32_HOST_OS) || defined(mingw32_TARGET_OS) || defined(__MINGW32__))
 showSockAddr (SockAddrUnix x) = return $ "UNIX socket at " ++ x
-showSockAddr (SockAddrInet6 _ _ _ _) = error "SockAddrInet6"
+showSockAddr (SockAddrInet6 {}) = error "SockAddrInet6"
 #endif
 showSockAddr sa@(SockAddrInet port _host) = do
   (Just h, _) <- getNameInfo [NI_NUMERICHOST] True False sa
-  return $ "IPv4 host " ++ h ++ ", port " ++ (show port)
+  return $ "IPv4 host " ++ h ++ ", port " ++ show port

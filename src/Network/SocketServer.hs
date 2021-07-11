@@ -1,5 +1,3 @@
-{-# LANGUAGE Trustworthy #-}
-
 {- arch-tag: Generic Server Support
 Copyright (c) 2004-2011 John Goerzen <jgoerzen@complete.org>
 
@@ -84,7 +82,7 @@ simpleTCPOptions ::
 simpleTCPOptions p =
   InetServerOptions
     { listenQueueSize = 5,
-      portNumber = (fromIntegral p),
+      portNumber = fromIntegral p,
       interface = 0,
       reuse = False,
       family = AF_INET,
@@ -108,10 +106,7 @@ setupSocketServer opts =
     setSocketOption
       s
       ReuseAddr
-      ( case (reuse opts) of
-          True -> 1
-          False -> 0
-      )
+      (if reuse opts then 1 else 0)
     bind
       s
       ( SockAddrInet
@@ -124,20 +119,18 @@ setupSocketServer opts =
 -- | Close the socket server.  Does not terminate active
 -- handlers, if any.
 closeSocketServer :: SocketServer -> IO ()
-closeSocketServer ss =
-  close (sockSS ss)
+closeSocketServer = close . sockSS
 
 -- | Handle one incoming request from the given 'SocketServer'.
 handleOne :: SocketServer -> HandlerT -> IO ()
 handleOne ss func = do
   a <- accept (sockSS ss)
   localaddr <- getSocketName (fst a)
-  func (fst a) (snd a) localaddr
+  uncurry func a localaddr
 
 -- | Handle all incoming requests from the given 'SocketServer'.
 serveForever :: SocketServer -> HandlerT -> IO ()
-serveForever ss func =
-  sequence_ (repeat (handleOne ss func))
+serveForever ss = sequence_ . repeat . handleOne ss
 
 -- | Convenience function to completely set up a TCP
 -- 'SocketServer' and handle all incoming requests.
@@ -153,10 +146,9 @@ serveTCPforever ::
   -- | Handler function
   HandlerT ->
   IO ()
-serveTCPforever options func =
-  do
-    sockserv <- setupSocketServer options
-    serveForever sockserv func
+serveTCPforever options func = do
+  sockserv <- setupSocketServer options
+  serveForever sockserv func
 
 ----------------------------------------------------------------------
 -- Combinators
@@ -177,26 +169,25 @@ loggingHandler ::
   HandlerT ->
   -- | Resulting handler
   HandlerT
-loggingHandler hname prio nexth socket' r_sockaddr l_sockaddr =
-  do
-    sockStr <- showSockAddr r_sockaddr
-    System.Log.Logger.logM
-      hname
-      prio
-      ("Received connection from " ++ sockStr)
-    System.Log.Logger.traplogging
-      hname
-      System.Log.Logger.WARNING
-      ""
-      ( nexth
-          socket'
-          r_sockaddr
-          l_sockaddr
-      )
-    System.Log.Logger.logM
-      hname
-      prio
-      ("Connection " ++ sockStr ++ " disconnected")
+loggingHandler hname prio nexth socket' r_sockaddr l_sockaddr = do
+  sockStr <- showSockAddr r_sockaddr
+  System.Log.Logger.logM
+    hname
+    prio
+    ("Received connection from " ++ sockStr)
+  System.Log.Logger.traplogging
+    hname
+    System.Log.Logger.WARNING
+    ""
+    ( nexth
+        socket'
+        r_sockaddr
+        l_sockaddr
+    )
+  System.Log.Logger.logM
+    hname
+    prio
+    ("Connection " ++ sockStr ++ " disconnected")
 
 -- | Handle each incoming connection in its own thread to
 -- make the server multi-tasking.

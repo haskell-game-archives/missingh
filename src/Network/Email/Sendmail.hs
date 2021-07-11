@@ -1,5 +1,4 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE Safe #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 {- arch-tag: Sendmail utility
@@ -82,12 +81,11 @@ sendmail :: Maybe String                -- ^ The envelope from address.  If not 
          -> String                      -- ^ The message itself.
          -> IO ()
 sendmail _ [] _ = fail "sendmail: no recipients specified"
-sendmail Nothing recipients msg = sendmail_worker recipients msg
-sendmail (Just from) recipients msg =
-    sendmail_worker (("-f" ++ from) : recipients) msg
+sendmail Nothing recipients msg = sendmailWorker recipients msg
+sendmail (Just from) recipients msg = sendmailWorker (("-f" ++ from) : recipients) msg
 
-sendmail_worker :: [String] -> String -> IO ()
-sendmail_worker args msg =
+sendmailWorker :: [String] -> String -> IO ()
+sendmailWorker args msg =
     let func h = hPutStr h msg
         in
         do
@@ -101,4 +99,3 @@ sendmail_worker args msg =
                       return $! r
 
 #endif
-

@@ -26,6 +26,8 @@ module Network.Email.Mailbox(Flag(..), Flags, Message,
                               MailboxWriter(..))
 where
 
+import Data.Functor
+
 {- | The flags which may be assigned to a message. -}
 data Flag = 
            SEEN
@@ -55,26 +57,27 @@ do so lazily.
 Implementing classes must provide, at minimum, 'getAll'.
 -}
 class (Show a, Show b, Eq b) => MailboxReader a b where
-    {- | Returns a list of all unique identifiers. -}
-    listIDs :: a -> IO [b]
-    {- | Returns a list of all unique identifiers as well as all flags. -}
-    listMessageFlags :: a -> IO [(b, Flags)]
-    {- | Returns a list of all messages, including their content,
-       flags, and unique identifiers. -}
-    getAll :: a -> IO [(b, Flags, Message)]
-    {- | Returns information about specific messages. -}
-    getMessages :: a -> [b] -> IO [(b, Flags, Message)]
+  {- | Returns a list of all unique identifiers. -}
+  listIDs :: a -> IO [b]
+  listIDs mb = listMessageFlags mb <&> map fst
 
-    listIDs mb = listMessageFlags mb >>= return . map fst
-    listMessageFlags mb = getAll mb >>= return . 
-                           map (\(i, f, _) -> (i, f))
-    getMessages mb list =
-        do messages <- getAll mb
-           return $ filter (\(id', _f, _m) -> id' `elem` list) messages
-    
+  {- | Returns a list of all unique identifiers as well as all flags. -}
+  listMessageFlags :: a -> IO [(b, Flags)]
+  listMessageFlags mb = getAll mb <&> map (\ (i, f, _) -> (i, f))
+
+  {- | Returns a list of all messages, including their content,
+      flags, and unique identifiers. -}
+  getAll :: a -> IO [(b, Flags, Message)]
+
+  {- | Returns information about specific messages. -}
+  getMessages :: a -> [b] -> IO [(b, Flags, Message)]
+  getMessages mb list = do
+    messages <- getAll mb
+    return $ filter (\(id', _f, _m) -> id' `elem` list) messages
+
 class (MailboxReader a b) => MailboxWriter a b where
-    appendMessages :: a -> [(Flags, Message)] -> IO [b]
-    deleteMessages :: a -> [b] -> IO ()
-    addFlags :: a -> [b] -> Flags -> IO ()
-    removeFlags :: a -> [b] -> Flags -> IO ()
-    setFlags :: a -> [b] -> Flags -> IO ()
+  appendMessages :: a -> [(Flags, Message)] -> IO [b]
+  deleteMessages :: a -> [b] -> IO ()
+  addFlags :: a -> [b] -> Flags -> IO ()
+  removeFlags :: a -> [b] -> Flags -> IO ()
+  setFlags :: a -> [b] -> Flags -> IO ()
