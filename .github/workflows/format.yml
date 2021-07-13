@@ -36,5 +36,4 @@ jobs:
       run: |
         export PATH=~/.cabal/bin/:$PATH
         cabal-fmt -i *.cabal
-        cabal-fmt -n cabal.project
         git --no-pager diff --exit-code
