@@ -11,7 +11,7 @@ realhandler h =
     let loop = do e <- hIsEOF h
                   if e then return ()
                      else do c <- hGetLine h
-                             case (rstrip c) of 
+                             case rstrip c of 
                                  "QUIT" -> hPutStr h "Goodbye!\n"
                                  "COMMANDS" -> do hPutStrLn h "You can type TIME for the current time"
                                                   loop
@@ -29,7 +29,9 @@ realhandler h =
               loop
               hClose h
 
-handler = threadedHandler $ loggingHandler "main" INFO $ handleHandler $
-            realhandler
-main = do updateGlobalLogger "main" (setLevel DEBUG)
-          serveTCPforever ((simpleInetOptions 12345) {reuse = True}) handler
+handler = threadedHandler $ loggingHandler "main" INFO $ handleHandler realhandler
+
+main :: Io ()
+main = do
+  updateGlobalLogger "main" (setLevel DEBUG)
+  serveTCPforever ((simpleInetOptions 12345) {reuse = True}) handler

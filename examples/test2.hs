@@ -18,9 +18,14 @@ lineInteraction inp =
          "you in uppercase.  When done, just type \"QUIT\" to exit.\n") :
          realInteract (map rstrip inp)
 
-realhandler h = do hLineInteract h h lineInteraction
-                   hClose h
-handler = threadedHandler $ loggingHandler "main" INFO $ handleHandler $
-            realhandler
-main = do updateGlobalLogger "main" (setLevel DEBUG)
-          serveTCPforever ((simpleInetOptions 12345) {reuse = True}) handler
+realhandler h = do
+  hLineInteract h h lineInteraction
+  hClose h
+
+
+handler = threadedHandler $ loggingHandler "main" INFO $ handleHandler realhandler
+
+main :: IO ()
+main = do
+  updateGlobalLogger "main" (setLevel DEBUG)
+  serveTCPforever ((simpleInetOptions 12345) {reuse = True}) handler

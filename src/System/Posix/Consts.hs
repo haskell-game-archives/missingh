@@ -1,4 +1,3 @@
-{-# LANGUAGE Safe #-}
 {- Posix consts not included with Haskell
 Copyright (c) 2005-2011 John Goerzen <jgoerzen@complete.org>
 
@@ -7,21 +6,19 @@ All rights reserved.
 For license and copyright information, see the file LICENSE
 -}
 
-{- |
-   Module     : System.Posix.Consts
-   Copyright  : Copyright (C) 2005-2011 John Goerzen
-   SPDX-License-Identifier: BSD-3-Clause
-
-   Stability  : provisional
-   Portability: portable
-
-Exports some POSIX constants and functions that are not exported in fptools
-by default.
-
--}
-
+-- |
+--   Module     : System.Posix.Consts
+--   Copyright  : Copyright (C) 2005-2011 John Goerzen
+--   SPDX-License-Identifier: BSD-3-Clause
+--
+--   Stability  : provisional
+--   Portability: portable
+--
+-- Exports some POSIX constants and functions that are not exported in fptools
+-- by default.
 module System.Posix.Consts where
-import           System.Posix.Types
+
+import System.Posix.Types
 
 blockSpecialMode :: FileMode
 blockSpecialMode = 0o0060000
@@ -46,5 +43,3 @@ socketMode = 0o0140000
 
 symbolicLinkMode :: FileMode
 symbolicLinkMode = 0o0120000
-
-
