@@ -1,6 +1,3 @@
-{-# LANGUAGE Safe #-}
-{-# OPTIONS_GHC -fno-warn-missing-methods #-}
-
 -- |
 --   Module     : Data.Hash.MD5
 --   Copyright  : Copyright (C) 2001 Ian Lynagh
@@ -27,7 +24,7 @@ module Data.Hash.MD5
 where
 
 import Data.Bits
-import Data.Char (chr, ord)
+import Data.Char
 import Data.Word
 
 -- | Synonym for 'Word64' due to historic reasons
@@ -123,6 +120,11 @@ instance MD5 WordList where
 -- | __WARNING__: This instance only defines the '+' operation
 instance Num ABCD where
   ABCD (a1, b1, c1, d1) + ABCD (a2, b2, c2, d2) = ABCD (a1 + a2, b1 + b2, c1 + c2, d1 + d2)
+  (*) = undefined
+  abs = undefined
+  signum = undefined
+  fromInteger = undefined
+  negate = undefined
 
 -- ======================== EXPORTED FUNCTIONS ========================
 

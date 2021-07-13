@@ -1,7 +1,7 @@
 -- arch-tag: Command utilities main file
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 {-
 Copyright (c) 2004-2011 John Goerzen <jgoerzen@complete.org>
@@ -11,63 +11,61 @@ All rights reserved.
 For license and copyright information, see the file LICENSE
 -}
 
-{- |
-   Module     : System.Cmd.Utils
-   Copyright  : Copyright (C) 2004-2011 John Goerzen
-   SPDX-License-Identifier: BSD-3-Clause
-
-   Stability  : provisional
-   Portability: portable to platforms with POSIX process\/signal tools
-
-Command invocation utilities.
-
-Written by John Goerzen, jgoerzen\@complete.org
-
-Please note: Most of this module is not compatible with Hugs.
-
-Command lines executed will be logged using "System.Log.Logger" at the
-DEBUG level.  Failure messages will be logged at the WARNING level in addition
-to being raised as an exception.  Both are logged under
-\"System.Cmd.Utils.funcname\" -- for instance,
-\"System.Cmd.Utils.safeSystem\".  If you wish to suppress these messages
-globally, you can simply run:
-
-> updateGlobalLogger "System.Cmd.Utils.safeSystem"
->                     (setLevel CRITICAL)
-
-See also: 'System.Log.Logger.updateGlobalLogger',
-"System.Log.Logger".
-
-It is possible to set up pipelines with these utilities.  Example:
-
-> (pid1, x1) <- pipeFrom "ls" ["/etc"]
-> (pid2, x2) <- pipeBoth "grep" ["x"] x1
-> putStr x2
-> ... the grep output is displayed ...
-> forceSuccess pid2
-> forceSuccess pid1
-
-Remember, when you use the functions that return a String, you must not call
-'forceSuccess' until after all data from the String has been consumed.  Failure
-to wait will cause your program to appear to hang.
-
-Here is an example of the wrong way to do it:
-
-> (pid, x) <- pipeFrom "ls" ["/etc"]
-> forceSuccess pid         -- Hangs; the called program hasn't terminated yet
-> processTheData x
-
-You must instead process the data before calling 'forceSuccess'.
-
-When using the hPipe family of functions, this is probably more obvious.
-
-Most of this module will be incompatible with Windows.
--}
-
-
-module System.Cmd.Utils(-- * High-Level Tools
-                    PipeHandle(..),
-                    safeSystem,
+-- |
+--   Module     : System.Cmd.Utils
+--   Copyright  : Copyright (C) 2004-2011 John Goerzen
+--   SPDX-License-Identifier: BSD-3-Clause
+--
+--   Stability  : provisional
+--   Portability: portable to platforms with POSIX process\/signal tools
+--
+-- Command invocation utilities.
+--
+-- Written by John Goerzen, jgoerzen\@complete.org
+--
+-- Please note: Most of this module is not compatible with Hugs.
+--
+-- Command lines executed will be logged using "System.Log.Logger" at the
+-- DEBUG level.  Failure messages will be logged at the WARNING level in addition
+-- to being raised as an exception.  Both are logged under
+-- \"System.Cmd.Utils.funcname\" -- for instance,
+-- \"System.Cmd.Utils.safeSystem\".  If you wish to suppress these messages
+-- globally, you can simply run:
+--
+-- > updateGlobalLogger "System.Cmd.Utils.safeSystem"
+-- >                     (setLevel CRITICAL)
+--
+-- See also: 'System.Log.Logger.updateGlobalLogger',
+-- "System.Log.Logger".
+--
+-- It is possible to set up pipelines with these utilities.  Example:
+--
+-- > (pid1, x1) <- pipeFrom "ls" ["/etc"]
+-- > (pid2, x2) <- pipeBoth "grep" ["x"] x1
+-- > putStr x2
+-- > ... the grep output is displayed ...
+-- > forceSuccess pid2
+-- > forceSuccess pid1
+--
+-- Remember, when you use the functions that return a String, you must not call
+-- 'forceSuccess' until after all data from the String has been consumed.  Failure
+-- to wait will cause your program to appear to hang.
+--
+-- Here is an example of the wrong way to do it:
+--
+-- > (pid, x) <- pipeFrom "ls" ["/etc"]
+-- > forceSuccess pid         -- Hangs; the called program hasn't terminated yet
+-- > processTheData x
+--
+-- You must instead process the data before calling 'forceSuccess'.
+--
+-- When using the hPipe family of functions, this is probably more obvious.
+--
+-- Most of this module will be incompatible with Windows.
+module System.Cmd.Utils
+  ( -- * High-Level Tools
+    PipeHandle (..),
+    safeSystem,
 #if !(defined(mingw32_HOST_OS) || defined(mingw32_TARGET_OS) || defined(__MINGW32__))
                     forceSuccess,
 #ifndef __HUGS__
@@ -84,47 +82,50 @@ module System.Cmd.Utils(-- * High-Level Tools
                     hPipeBoth,
 #endif
 #endif
-                    -- * Low-Level Tools
-                    PipeMode(..),
+
+    -- * Low-Level Tools
+    PipeMode (..),
 #if !(defined(mingw32_HOST_OS) || defined(mingw32_TARGET_OS) || defined(__MINGW32__))
 #ifndef __HUGS__
                     pOpen, pOpen3, pOpen3Raw
 #endif
 #endif
-                   )
+  )
 where
 
 -- FIXME - largely obsoleted by 6.4 - convert to wrappers.
 
-import System.Exit
-import System.Log.Logger
 #if !(defined(mingw32_HOST_OS) || defined(mingw32_TARGET_OS) || defined(__MINGW32__))
 import System.Posix.IO
 import System.Posix.Process
 import System.Posix.Signals
 #endif
-import System.Posix.Types
-import System.IO
+
 import Control.Concurrent
 import Control.Exception
+import System.Exit
+import System.IO
+import System.Log.Logger
+import System.Posix.Types
 
 data PipeMode = ReadFromPipe | WriteToPipe
 
 logbase :: String
 logbase = "System.Cmd.Utils"
 
-{- | Return value from 'pipeFrom', 'pipeLinesFrom', 'pipeTo', or
-'pipeBoth'.  Contains both a ProcessID and the original command that was
-executed.  If you prefer not to use 'forceSuccess' on the result of one
-of these pipe calls, you can use (processID ph), assuming ph is your 'PipeHandle',
-as a parameter to 'System.Posix.Process.getProcessStatus'. -}
-data PipeHandle =
-    PipeHandle { processID :: ProcessID,
-                 phCommand :: FilePath,
-                 phArgs :: [String],
-                 phCreator :: String -- ^ Function that created it
-               }
-    deriving (Eq, Show)
+-- | Return value from 'pipeFrom', 'pipeLinesFrom', 'pipeTo', or
+-- 'pipeBoth'.  Contains both a ProcessID and the original command that was
+-- executed.  If you prefer not to use 'forceSuccess' on the result of one
+-- of these pipe calls, you can use (processID ph), assuming ph is your 'PipeHandle',
+-- as a parameter to 'System.Posix.Process.getProcessStatus'.
+data PipeHandle = PipeHandle
+  { processID :: ProcessID,
+    phCommand :: FilePath,
+    phArgs :: [String],
+    -- | Function that created it
+    phCreator :: String
+  }
+  deriving (Eq, Show)
 
 #if !(defined(mingw32_HOST_OS) || defined(mingw32_TARGET_OS) || defined(__MINGW32__))
 #ifndef __HUGS__
@@ -147,9 +148,9 @@ logRunning func fp args = debugM (logbase ++ "." ++ func) (showCmd fp args)
 warnFail :: [Char] -> FilePath -> [String] -> [Char] -> IO t
 warnFail funcname fp args msg =
   let m = showCmd fp args ++ ": " ++ msg
-   in do warningM (logbase ++ "." ++ funcname) m
-         fail m
-
+   in do
+        warningM (logbase ++ "." ++ funcname) m
+        fail m
 #if !(defined(mingw32_HOST_OS) || defined(mingw32_TARGET_OS) || defined(__MINGW32__))
 #ifndef __HUGS__
 {- | Read data from a pipe.  Returns a Handle and a 'PipeHandle'.
@@ -165,9 +166,10 @@ hPipeFrom :: FilePath -> [String] -> IO (PipeHandle, Handle)
 hPipeFrom fp args = do
   pipepair <- createPipe
   logRunning "pipeFrom" fp args
-  let childstuff = do _ <- dupTo (snd pipepair) stdOutput
-                      closeFd (fst pipepair)
-                      executeFile fp True args Nothing
+  let childstuff = do
+        _ <- dupTo (snd pipepair) stdOutput
+        closeFd (fst pipepair)
+        executeFile fp True args Nothing
   p <- try (forkProcess childstuff)
   -- parent
   pid <- case p of
@@ -214,15 +216,15 @@ hPipeTo :: FilePath -> [String] -> IO (PipeHandle, Handle)
 hPipeTo fp args = do
   pipepair <- createPipe
   logRunning "pipeTo" fp args
-  let childstuff = do _ <- dupTo (fst pipepair) stdInput
-                      closeFd (snd pipepair)
-                      executeFile fp True args Nothing
+  let childstuff = do
+        _ <- dupTo (fst pipepair) stdInput
+        closeFd (snd pipepair)
+        executeFile fp True args Nothing
   p <- try (forkProcess childstuff)
   -- parent
   pid <- case p of
-              Right x -> return x
-              Left (e :: IOException) -> warnFail "pipeTo" fp args $
-                        "Error in fork: " ++ show e
+            Right x -> return x
+            Left (e :: IOException) -> warnFail "pipeTo" fp args $ "Error in fork: " ++ show e
   closeFd (fst pipepair)
   h <- fdToHandle (snd pipepair)
   return (PipeHandle pid fp args "pipeTo", h)
@@ -267,17 +269,17 @@ hPipeBoth fp args = do
   frompair <- createPipe
   topair <- createPipe
   logRunning "pipeBoth" fp args
-  let childstuff = do _ <- dupTo (snd frompair) stdOutput
-                      closeFd (fst frompair)
-                      _ <- dupTo (fst topair) stdInput
-                      closeFd (snd topair)
-                      executeFile fp True args Nothing
+  let childstuff = do
+        _ <- dupTo (snd frompair) stdOutput
+        closeFd (fst frompair)
+        _ <- dupTo (fst topair) stdInput
+        closeFd (snd topair)
+        executeFile fp True args Nothing
   p <- try (forkProcess childstuff)
   -- parent
   pid <- case p of
-              Right x -> return x
-              Left (e :: IOException) -> warnFail "pipeBoth" fp args $
-                        "Error in fork: " ++ show e
+            Right x -> return x
+            Left (e :: IOException) -> warnFail "pipeBoth" fp args $ "Error in fork: " ++ show e
   closeFd (snd frompair)
   closeFd (fst topair)
   fromh <- fdToHandle (fst frompair)
@@ -315,8 +317,7 @@ Not available on Windows. -}
 forceSuccess :: PipeHandle -> IO ()
 forceSuccess (PipeHandle pid fp args funcname) =
   let warnfail = warnFail funcname
-   in do
-      getProcessStatus True False pid >>= \case
+   in getProcessStatus True False pid >>= \case
         Nothing -> warnfail fp args "Got no process status"
         Just (Exited ExitSuccess) -> return ()
         Just (Exited (ExitFailure fc)) -> cmdfailed funcname fp args fc
@@ -329,15 +330,15 @@ forceSuccess (PipeHandle pid fp args funcname) =
         Just (Stopped sig) -> warnfail fp args $ "Stopped by signal " ++ show sig
 #endif
 
-{- | Invokes the specified command in a subprocess, waiting for the result.
-If the command terminated successfully, return normally.  Otherwise,
-raises a userError with the problem.
-
-Implemented in terms of 'posixRawSystem' where supported, and System.Posix.rawSystem otherwise.
--}
+-- | Invokes the specified command in a subprocess, waiting for the result.
+-- If the command terminated successfully, return normally.  Otherwise,
+-- raises a userError with the problem.
+--
+-- Implemented in terms of 'posixRawSystem' where supported, and System.Posix.rawSystem otherwise.
 safeSystem :: FilePath -> [String] -> IO ()
 safeSystem command args = do
   debugM (logbase ++ ".safeSystem") ("Running: " ++ command ++ " " ++ show args)
+
 #if defined(__HUGS__) || defined(mingw32_HOST_OS) || defined(mingw32_TARGET_OS) || defined(__MINGW32__)
   rawSystem command args >>= \case
     ExitSuccess -> return ()
@@ -387,7 +388,7 @@ posixRawSystem program args = do
     childaction oldint oldquit oldset = do
       restoresignals oldint oldquit oldset
       executeFile program True args Nothing
-    
+
     restoresignals oldint oldquit oldset = do
       _ <- installHandler sigINT oldint Nothing
       _ <- installHandler sigQUIT oldquit Nothing

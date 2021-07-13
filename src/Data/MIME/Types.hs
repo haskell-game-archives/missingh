@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 {- arch-tag: MIME Types main file
@@ -39,7 +40,7 @@ import qualified Control.Exception
 import Control.Monad
 import Data.Char
 import Data.Map (Map)
-import qualified Data.Map as Map hiding (Map)
+import qualified Data.Map as Map
 import Data.Map.Utils
 import System.IO
 import System.IO.Utils
@@ -218,17 +219,14 @@ defaultmtd =
 readSystemMIMETypes :: MIMETypeData -> IO MIMETypeData
 readSystemMIMETypes mtd =
   let tryread :: MIMETypeData -> String -> IO MIMETypeData
-      tryread inputobj filename =
-        do
-          fn <- Control.Exception.try (openFile filename ReadMode)
-          case fn of
-            Left (_ :: Control.Exception.IOException) -> return inputobj
-            Right h -> do
-              x <- hReadMIMETypes inputobj True h
-              hClose h
-              return x
-   in do
-        foldM tryread mtd defaultfilelocations
+      tryread inputobj filename = do
+        Control.Exception.try (openFile filename ReadMode) >>= \case
+          Left (_ :: Control.Exception.IOException) -> return inputobj
+          Right h -> do
+            x <- hReadMIMETypes inputobj True h
+            hClose h
+            return x
+   in foldM tryread mtd defaultfilelocations
 
 ----------------------------------------------------------------------
 -- Internal utilities

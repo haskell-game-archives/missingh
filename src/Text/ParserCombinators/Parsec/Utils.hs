@@ -40,6 +40,7 @@ where
 import Text.ParserCombinators.Parsec
 
 type GeneralizedToken a = (SourcePos, a)
+
 type GeneralizedTokenParser a st b = GenParser (GeneralizedToken a) st b
 
 -- | Generate (return) a 'GeneralizedToken'.

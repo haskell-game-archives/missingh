@@ -1,7 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE Safe #-}
 
 {-
 Copyright (c) 2006-2011 John Goerzen <jgoerzen@complete.org>
@@ -61,10 +60,10 @@ module Data.Progress.Tracker
 where
 
 import Control.Concurrent.MVar
+import Data.Functor
 import Data.Ratio
 import System.Time
 import System.Time.Utils
-import Data.Functor
 
 -- $introduction
 --
@@ -396,10 +395,9 @@ getETA ::
 getETA po = do
   etr <- getETR po
   -- FIXME: similar race potential here
-  withStatus po $ \status' ->
-    do
-      timenow <- timeSource status'
-      return $ timenow + etr
+  withStatus po $ \status' -> do
+    timenow <- timeSource status'
+    return $ timenow + etr
 
 ----------------------------------------------------------------------
 -- Utilities
@@ -413,8 +411,7 @@ defaultTimeSource = getClockTime <&> clockTimeToEpoch
 
 modStatus :: Progress -> (ProgressStatus -> ProgressStatus) -> IO ()
 -- FIXME/TODO: handle parents
-modStatus (Progress mp) func =
-  modifyMVar_ mp modfunc
+modStatus (Progress mp) func = modifyMVar_ mp modfunc
   where
     modfunc :: ProgressRecord -> IO ProgressRecord
     modfunc oldpr = do

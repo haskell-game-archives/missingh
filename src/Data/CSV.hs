@@ -1,4 +1,3 @@
-{-# LANGUAGE Safe #-}
 {-# LANGUAGE Rank2Types #-}
 
 {- arch-tag: CSV and TSV utilities
@@ -26,10 +25,11 @@ import Data.List
 import Text.ParserCombinators.Parsec
 
 eol :: forall st. GenParser Char st String
-eol = try (string "\n\r")
-  <|> try (string "\r\n")
-  <|> string "\n"
-  <|> string "\r" <?> "End of line"
+eol =
+  try (string "\n\r")
+    <|> try (string "\r\n")
+    <|> string "\n"
+    <|> string "\r" <?> "End of line"
 
 cell :: GenParser Char st String
 cell = quotedcell <|> many (noneOf ",\n\r")
@@ -37,10 +37,11 @@ cell = quotedcell <|> many (noneOf ",\n\r")
 quotedchar :: GenParser Char st Char
 quotedchar =
   noneOf "\""
-    <|> try ( do
-                _ <- string "\"\""
-                return '"'
-        )
+    <|> try
+      ( do
+          _ <- string "\"\""
+          return '"'
+      )
 
 quotedcell :: CharParser st String
 quotedcell = do

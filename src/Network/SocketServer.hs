@@ -99,22 +99,21 @@ data SocketServer = SocketServer
 -- | Takes some options and sets up the 'SocketServer'.  I will bind
 -- and begin listening, but will not accept any connections itself.
 setupSocketServer :: InetServerOptions -> IO SocketServer
-setupSocketServer opts =
-  do
-    proto <- getProtocolNumber (protoStr opts)
-    s <- socket (family opts) (sockType opts) proto
-    setSocketOption
-      s
-      ReuseAddr
-      (if reuse opts then 1 else 0)
-    bind
-      s
-      ( SockAddrInet
-          (portNumber opts)
-          (interface opts)
-      )
-    listen s (listenQueueSize opts)
-    return $ SocketServer {optionsSS = opts, sockSS = s}
+setupSocketServer opts = do
+  proto <- getProtocolNumber (protoStr opts)
+  s <- socket (family opts) (sockType opts) proto
+  setSocketOption
+    s
+    ReuseAddr
+    (if reuse opts then 1 else 0)
+  bind
+    s
+    ( SockAddrInet
+        (portNumber opts)
+        (interface opts)
+    )
+  listen s (listenQueueSize opts)
+  return $ SocketServer {optionsSS = opts, sockSS = s}
 
 -- | Close the socket server.  Does not terminate active
 -- handlers, if any.

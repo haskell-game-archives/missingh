@@ -45,10 +45,10 @@ module Data.String.Utils
   )
 where
 
-import Data.Char (isAlpha, isAscii, isDigit)
-import Data.List.Utils (endswith, join, replace, split, startswith)
-import Data.Maybe (listToMaybe)
-import Text.Regex (mkRegex, splitRegex)
+import Data.Char
+import Data.List.Utils
+import Data.Maybe
+import Text.Regex
 
 wschars :: String
 wschars = " \t\r\n"

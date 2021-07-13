@@ -1,5 +1,3 @@
-{-# LANGUAGE Safe #-}
-
 {- arch-tag: List utilities main file
 Copyright (c) 2004-2011 John Goerzen <jgoerzen@complete.org>
 
@@ -159,7 +157,7 @@ takeWhileList func list@(x : xs) =
 -- The function is given the remainder of the list to examine.
 dropWhileList :: ([a] -> Bool) -> [a] -> [a]
 dropWhileList _ [] = []
-dropWhileList func list@(_:xs) =
+dropWhileList func list@(_ : xs) =
   if func list
     then dropWhileList func xs
     else list
@@ -347,7 +345,7 @@ alwaysElemRIndex item list =
 -- | Forces the evaluation of the entire list.
 seqList :: [a] -> [a]
 seqList [] = []
-seqList list@(_:xs) = seq (seqList xs) list
+seqList list@(_ : xs) = seq (seqList xs) list
 
 --------------------------------------------------
 -- Advanced Conversions
@@ -435,12 +433,11 @@ fixedWidth = WholeFunc . fixedWidthFunc
 --
 -- >("Tes,tI","ng")
 grab :: Int -> State [a] [a]
-grab count =
-  do
-    g <- get
-    (x, g') <- return $ splitAt count g
-    put g'
-    return x
+grab count = do
+  g <- get
+  (x, g') <- return $ splitAt count g
+  put g'
+  return x
 
 -- | Similar to Data.List.elemIndex.  Instead of looking for one element in a
 -- list, this function looks for the first occurance of a sublist in the list,
@@ -459,7 +456,7 @@ grab count =
 -- >subIndex "test" "asdftestbartest" -> Just 4
 -- >subIndex [(1::Int), 2] [0, 5, 3, 2, 1, 2, 4] -> Just 4
 subIndex :: Eq a => [a] -> [a] -> Maybe Int
-subIndex substr str = findIndex (isPrefixOf substr) (tails str)
+subIndex substr = findIndex (isPrefixOf substr) . tails
 
 -- | Given a list, returns a new list with all duplicate elements removed.
 -- For example:

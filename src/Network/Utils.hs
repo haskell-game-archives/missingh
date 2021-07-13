@@ -31,7 +31,7 @@ where
 #if !(defined(mingw32_HOST_OS) || defined(mingw32_TARGET_OS) || defined(__MINGW32__))
 import qualified System.Posix.Signals
 #endif
-import Control.Exception (bracketOnError)
+import Control.Exception
 import Network.BSD
 import Network.Socket
 
@@ -48,13 +48,13 @@ import Network.Socket
 niceSocketsDo :: IO a -> IO a
 niceSocketsDo func = do
 #if !(defined(mingw32_HOST_OS) || defined(mingw32_TARGET_OS) || defined(__MINGW32__))
-                -- No signals on Windows anyway
-                _ <- System.Posix.Signals.installHandler
-                      System.Posix.Signals.sigPIPE
-                      System.Posix.Signals.Ignore
-                      Nothing
+  -- No signals on Windows anyway
+  _ <- System.Posix.Signals.installHandler
+        System.Posix.Signals.sigPIPE
+        System.Posix.Signals.Ignore
+        Nothing
 #endif
-                withSocketsDo func
+  withSocketsDo func
 
 connectTCP :: HostName -> PortNumber -> IO Socket
 connectTCP host port = do

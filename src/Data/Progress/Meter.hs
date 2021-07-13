@@ -1,5 +1,4 @@
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE Safe #-}
 
 {-
 Copyright (c) 2006-2011 John Goerzen <jgoerzen@complete.org>
@@ -44,12 +43,12 @@ module Data.Progress.Meter
 where
 
 import Control.Concurrent
-import Control.Monad (filterM, when)
+import Control.Monad hiding (join)
 import Data.Progress.Tracker
-import Data.Quantity (binaryOpts, renderNums)
-import Data.String.Utils (join)
+import Data.Quantity
+import Data.String.Utils
 import System.IO
-import System.Time.Utils (renderSecs)
+import System.Time.Utils
 
 -- | The main data type for the progress meter.
 data ProgressMeterR = ProgressMeterR
@@ -114,13 +113,12 @@ addComponent meter component =
 
 -- | Remove a component by name.
 removeComponent :: ProgressMeter -> String -> IO ()
-removeComponent meter componentname = modifyMVar_ meter $ \m ->
-  do
-    newc <-
-      filterM
-        (\x -> withStatus x (\y -> return $ trackerName y /= componentname))
-        (components m)
-    return $ m {components = newc}
+removeComponent meter componentname = modifyMVar_ meter $ \m -> do
+  newc <-
+    filterM
+      (\x -> withStatus x (\y -> return $ trackerName y /= componentname))
+      (components m)
+  return $ m {components = newc}
 
 -- | Adjusts the width of this 'ProgressMeter'.
 setWidth :: ProgressMeter -> Int -> IO ()
@@ -132,11 +130,10 @@ setWidth meter w = modifyMVar_ meter (\m -> return $ m {width = w})
 --
 -- Pass stdout as the handle for regular display to the screen.
 displayMeter :: Handle -> ProgressMeter -> IO ()
-displayMeter h r = withMVar r $ \meter ->
-  do
-    s <- renderMeterR meter
-    hPutStr h ("\r" ++ s)
-    hFlush h
+displayMeter h r = withMVar r $ \meter -> do
+  s <- renderMeterR meter
+  hPutStr h ("\r" ++ s)
+  hFlush h
 
 -- By placing this whole thing under withMVar, we can effectively
 -- lock the IO and prevent IO from stomping on each other.
@@ -146,23 +143,21 @@ displayMeter h r = withMVar r $ \meter ->
 --
 -- Pass stdout as the handle for regular display to the screen.
 clearMeter :: Handle -> ProgressMeter -> IO ()
-clearMeter h pm = withMVar pm $ \m ->
-  do
-    hPutStr h (clearmeterstr m)
-    hFlush h
+clearMeter h pm = withMVar pm $ \m -> do
+  hPutStr h (clearmeterstr m)
+  hFlush h
 
 -- | Clears the meter, writes the given string, then restores the meter.
 -- The string is assumed to contain a trailing newline.
 --
 -- Pass stdout as the handle for regular display to the screen.
 writeMeterString :: Handle -> ProgressMeter -> String -> IO ()
-writeMeterString h pm msg = withMVar pm $ \meter ->
-  do
-    s <- renderMeterR meter
-    hPutStr h (clearmeterstr meter)
-    hPutStr h msg
-    hPutStr h s
-    hFlush h
+writeMeterString h pm msg = withMVar pm $ \meter -> do
+  s <- renderMeterR meter
+  hPutStr h (clearmeterstr meter)
+  hPutStr h msg
+  hPutStr h s
+  hFlush h
 
 clearmeterstr :: ProgressMeterR -> String
 clearmeterstr m = "\r" ++ replicate (width m - 1) ' ' ++ "\r"
@@ -181,11 +176,10 @@ autoDisplayMeter ::
   (ProgressMeter -> IO ()) ->
   -- | Resulting thread id
   IO ThreadId
-autoDisplayMeter pm delay displayfunc =
-  do
-    thread <- forkIO workerthread
-    modifyMVar_ pm (\p -> return $ p {autoDisplayers = thread : autoDisplayers p})
-    return thread
+autoDisplayMeter pm delay displayfunc = do
+  thread <- forkIO workerthread
+  modifyMVar_ pm (\p -> return $ p {autoDisplayers = thread : autoDisplayers p})
+  return thread
   where
     workerthread = do
       tid <- myThreadId
@@ -216,20 +210,20 @@ renderMeter r = withMVar r renderMeterR
 
 renderMeterR :: ProgressMeterR -> IO String
 renderMeterR meter = do
-    overallpct <- renderpct $ masterP meter
-    compnnts <-
-      mapM
-        (rendercomponent $ renderer meter)
-        (components meter)
-    let componentstr = case join " " compnnts of
-          [] -> ""
-          x -> x ++ " "
-    rightpart <- renderoverall (renderer meter) (masterP meter)
-    let leftpart = overallpct ++ " " ++ componentstr
-    let padwidth = width meter - 1 - length leftpart - length rightpart
-    if padwidth < 1
-      then return $ take (width meter - 1) $ leftpart ++ rightpart
-      else return $ leftpart ++ replicate padwidth ' ' ++ rightpart
+  overallpct <- renderpct $ masterP meter
+  compnnts <-
+    mapM
+      (rendercomponent $ renderer meter)
+      (components meter)
+  let componentstr = case join " " compnnts of
+        [] -> ""
+        x -> x ++ " "
+  rightpart <- renderoverall (renderer meter) (masterP meter)
+  let leftpart = overallpct ++ " " ++ componentstr
+  let padwidth = width meter - 1 - length leftpart - length rightpart
+  if padwidth < 1
+    then return $ take (width meter - 1) $ leftpart ++ rightpart
+    else return $ leftpart ++ replicate padwidth ' ' ++ rightpart
   where
     u = unit meter
     renderpct pt = withStatus pt renderpctpts

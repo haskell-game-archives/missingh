@@ -30,11 +30,13 @@ For license and copyright information, see the file LICENSE
 -- <http://www.haskell.org/hawiki/HaskellUnixDaemon>.
 --
 -- This module is not available on Windows.
-module System.Daemon (
+module System.Daemon
+  (
 #if !(defined(mingw32_HOST_OS) || defined(mingw32_TARGET_OS) || defined(__MINGW32__))
-  detachDaemon
+    detachDaemon
 #endif
-) where
+  )
+where
 
 #if !(defined(mingw32_HOST_OS) || defined(mingw32_TARGET_OS) || defined(__MINGW32__))
 

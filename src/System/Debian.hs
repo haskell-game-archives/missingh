@@ -1,3 +1,5 @@
+{-# LANGUAGE LambdaCase #-}
+
 {- arch-tag: Debian Package utilities main file
 Copyright (c) 2004-2011 John Goerzen <jgoerzen@complete.org>
 
@@ -30,7 +32,7 @@ module System.Debian
 where
 
 import System.Exit
-import System.IO.Unsafe (unsafePerformIO)
+import System.IO.Unsafe
 import System.Process
 
 -- | The type representing the contents of a Debian control file,
@@ -75,9 +77,7 @@ checkDebVersion ::
   -- | Version 2
   String ->
   IO Bool
-checkDebVersion v1 op v2 =
-  do
-    ec <- rawSystem "dpkg" ["--compare-versions", v1, op, v2]
-    case ec of
-      ExitSuccess -> return True
-      ExitFailure _ -> return False
+checkDebVersion v1 op v2 = do
+  rawSystem "dpkg" ["--compare-versions", v1, op, v2] >>= \case
+    ExitSuccess -> return True
+    ExitFailure _ -> return False

@@ -1,6 +1,6 @@
-{-# LANGUAGE Safe #-}
 {-# LANGUAGE InstanceSigs #-}
-{-# LANGuAGE TupleSections #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TupleSections #-}
 
 -- arch-tag: Inflate implementation for Haskell
 
@@ -92,7 +92,7 @@ newtype Bit = Bit Bool
   deriving (Eq)
 
 instance Show Bit where
-  show = (:[]) . showB
+  show = (: []) . showB
   showList bs = showString $ "'" ++ map showB bs ++ "'"
 
 showB :: Bit -> Char
@@ -125,7 +125,7 @@ data State = State
 data InfM a = InfM (State -> (a, State))
 
 instance Monad InfM where
-  (>>=)  :: InfM a -> (a -> InfM b) -> InfM b
+  (>>=) :: InfM a -> (a -> InfM b) -> InfM b
   InfM v >>= f = InfM $ \s ->
     let (x, s') = v s
         InfM y = f x
@@ -140,7 +140,8 @@ instance Applicative InfM where
 
 instance Functor InfM where
   fmap f (InfM g) = InfM $ \s ->
-    case g s of ~(a, s') -> (f a, s')
+    case g s of
+      ~(a, s') -> (f a, s')
 
 setBits :: [Bit] -> InfM ()
 setBits bs = InfM $ const ((), State bs 0 (array (0, 32767) []) 0)
@@ -208,8 +209,7 @@ get_w32 i = do
 
 getBit :: InfM Bit
 getBit = do
-  res <- getBits 1
-  case res of
+  getBits 1 >>= \case
     [x] -> return x
     _ -> error "getBit: expected exactly one bit"
 
@@ -229,56 +229,48 @@ inflate is = extractInfM $ do
 -- Bool is true if we have seen the "last" block
 inflateBlocks :: Bool -> InfM Output
 inflateBlocks True = return []
-inflateBlocks False =
-  do
-    res <- getBits 3
-    case res of
-      [Bit is_last, Bit t1, Bit t2] ->
-        case (t1, t2) of
-          (False, False) ->
-            do
-              align_8_bits
-              len <- get_w32 16
-              nlen <- get_w32 16
-              unless (len + nlen == 2 ^ (32 :: Int) - 1) $
-                error "inflateBlocks: Mismatched lengths"
-              ws <- get_word32s 8 len
-              mapM_ output_w32 ws
-              return ws
-          (True, False) ->
-            inflateCodes is_last inflateTreesFixed
-          (False, True) ->
-            do
-              tables <- inflateTables
-              inflateCodes is_last tables
-          (True, True) ->
-            error "inflateBlocks: case 11 reserved"
-      _ -> error "inflateBlocks: expected 3 bits"
+inflateBlocks False = do
+  getBits 3 >>= \case
+    [Bit is_last, Bit t1, Bit t2] ->
+      case (t1, t2) of
+        (False, False) -> do
+          align_8_bits
+          len <- get_w32 16
+          nlen <- get_w32 16
+          unless (len + nlen == 2 ^ (32 :: Int) - 1) $ error "inflateBlocks: Mismatched lengths"
+          ws <- get_word32s 8 len
+          mapM_ output_w32 ws
+          return ws
+        (True, False) -> inflateCodes is_last inflateTreesFixed
+        (False, True) -> do
+          tables <- inflateTables
+          inflateCodes is_last tables
+        (True, True) -> error "inflateBlocks: case 11 reserved"
+    _ -> error "inflateBlocks: expected 3 bits"
 
 inflateTables :: InfM Tables
-inflateTables =
-  do
-    hlit <- get_w32 5
-    hdist <- get_w32 5
-    hclen <- get_w32 4
-    llc_bs <- getBits ((hclen + 4) * 3)
-    let llc_bs' =
-          zip
-            (map bits_to_word32 $ triple llc_bs)
-            [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15]
-        tab = makeTable llc_bs'
-    lit_dist_lengths <-
-      makeLitDistLengths
-        tab
-        (258 + hlit + hdist)
-        (error "inflateTables dummy")
-    let (lit_lengths, dist_lengths) =
-          genericSplitAt
-            (257 + hlit)
-            lit_dist_lengths
-        lit_table = makeTable (zip lit_lengths [0 ..])
-        dist_table = makeTable (zip dist_lengths [0 ..])
-    return (lit_table, dist_table)
+inflateTables = do
+  hlit <- get_w32 5
+  hdist <- get_w32 5
+  hclen <- get_w32 4
+  llc_bs <- getBits ((hclen + 4) * 3)
+  let llc_bs' =
+        zip
+          (map bits_to_word32 $ triple llc_bs)
+          [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15]
+      tab = makeTable llc_bs'
+  lit_dist_lengths <-
+    makeLitDistLengths
+      tab
+      (258 + hlit + hdist)
+      (error "inflateTables dummy")
+  let (lit_lengths, dist_lengths) =
+        genericSplitAt
+          (257 + hlit)
+          lit_dist_lengths
+      lit_table = makeTable (zip lit_lengths [0 ..])
+      dist_table = makeTable (zip dist_lengths [0 ..])
+  return (lit_table, dist_table)
 
 triple :: [a] -> [[a]]
 triple (a : b : c : xs) = [a, b, c] : triple xs
@@ -323,12 +315,11 @@ inflateCodes seen_last tabs@(tab_litlen, tab_dist) = do
             return [i]
           else case lookup i litlens of
             Nothing -> error "do_code_litlen"
-            Just (base, num_bits) ->
-              do
-                extra <- get_w32 num_bits
-                let l = base + extra
-                dist <- distCode tab_dist
-                repeat_w32s l dist
+            Just (base, num_bits) -> do
+              extra <- get_w32 num_bits
+              let l = base + extra
+              dist <- distCode tab_dist
+              repeat_w32s l dist
       o <- inflateCodes seen_last tabs
       return (pref ++ o)
 
@@ -386,9 +377,10 @@ from a list of length code pairs is a simple recursive process.
 data Tree = Branch Tree Tree | Leaf Word32 | Null
 
 makeTable :: [(Length, Code)] -> Table
-makeTable lcs = case makeTree 0 $ sort $ filter ((/= 0) . fst) lcs of
-  (tree, []) -> getCode tree
-  _ -> error "makeTable: Left-over lcs from"
+makeTable lcs =
+  case makeTree 0 $ sort $ filter ((/= 0) . fst) lcs of
+    (tree, []) -> getCode tree
+    _ -> error "makeTable: Left-over lcs from"
 
 getCode :: Tree -> InfM Code
 getCode (Branch zero_tree one_tree) = do
